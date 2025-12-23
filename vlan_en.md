@@ -209,6 +209,25 @@ iptables -A FORWARD -i eth2 -m state --state ESTABLISHED,RELATED -j ACCEPT
 '
 ```
 
+**Command Breakdown:**
+
+1.  `iptables -t nat -A POSTROUTING -o eth2 -j MASQUERADE`
+    -   **Meaning:** "Rewrite the source IP of packets going out to the Internet (`eth2`) to the router's own IP."
+    -   `-t nat`: Uses the NAT table for address translation.
+    -   `POSTROUTING`: Processes packets *after* the routing decision has been made.
+    -   `MASQUERADE`: Performs dynamic IP Masquerading (NAPT).
+
+2.  `iptables -A FORWARD -i eth0 -o eth2 -j ACCEPT`
+    -   **Meaning:** "Allow (`ACCEPT`) packets entering from VLAN 10 (`eth0`) and destined for the Internet (`eth2`)."
+    -   `FORWARD`: The chain that handles packets simply passing *through* the router (not destined for the router itself).
+
+3.  `iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT`
+    -   **Meaning:** "Allow packets entering from VLAN 20 (`eth1`) and destined for the Internet (`eth2`)."
+
+4.  `iptables -A FORWARD -i eth2 -m state --state ESTABLISHED,RELATED -j ACCEPT`
+    -   **Meaning:** "Allow packets returning from the Internet (`eth2`) only if they are part of an existing connection (`ESTABLISHED`) or related to one (`RELATED`)."
+    -   Without this, you could send requests out, but the firewall would block the responses (like web pages) from coming back.
+
 > **📝 Note: NAT and IP Masquerade (NAPT)**
 >
 > **NAT (Network Address Translation):**
@@ -301,6 +320,28 @@ sudo podman exec a dig www.google.com
 # Check HTTP
 sudo podman exec a curl -I https://www.google.com
 # Response like HTTP/2 200 ... is OK
+```
+
+### 3. Experiment: Blocking and Restoring Routing
+
+Let's add a rule to the router's `FORWARD` chain to block traffic from VLAN 10 (`eth0`) to VLAN 20 (`eth1`).
+
+```bash
+# 1. Add a blocking rule (Insert at the top)
+# "Drop packets entering from eth0 and exiting to eth1"
+sudo podman exec router iptables -I FORWARD -i eth0 -o eth1 -j DROP
+
+# 2. Verify reachability (Confirm failure)
+# Container A -> Container B
+sudo podman exec a ping -c 3 -W 1 192.168.20.20
+# Result: Should result in 100% packet loss
+
+# 3. Delete the rule (Restore)
+# Delete (-D) the rule we added
+sudo podman exec router iptables -D FORWARD -i eth0 -o eth1 -j DROP
+
+# 4. Verify reachability (Confirm success)
+sudo podman exec a ping -c 3 192.168.20.20
 ```
 
 ---
