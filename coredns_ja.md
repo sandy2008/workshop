@@ -21,6 +21,7 @@
 ```
 
 **学ぶこと:**
+
 1. **権威 DNS サーバー (Authoritative Server):** 自分のドメイン（ゾーン）の情報を持ち、問い合わせに答えるサーバー。
 2. **フォワーディング (Forwarding):** 自分が知らないドメインの問い合わせを、別のサーバーに転送する仕組み。
 3. **ゾーン階層:** 親 (`sokoide.com`) と子 (`foo.sokoide.com`) の関係性。
@@ -30,12 +31,13 @@
 ## 前提条件
 
 - **VM 2台** (Ubuntu 24.04 推奨)
-    - **VM1 (Parent):** IP `192.168.100.10`
-    - **VM2 (Child):** IP `192.168.100.20`
-    - ※ IPアドレスが異なる場合は、以降の手順の IP を適宜読み替えてください。
+  - **VM1 (Parent):** IP `192.168.100.10`
+  - **VM2 (Child):** IP `192.168.100.20`
+  - ※ IPアドレスが異なる場合は、以降の手順の IP を適宜読み替えてください。
 - **ツール:** `curl`, `tar`, `dig` (dnsutils)
 
 **事前準備 (両方の VM で実行):**
+
 ```bash
 sudo apt update && sudo apt install -y curl tar dnsutils
 ```
@@ -50,7 +52,7 @@ CoreDNS は Go 言語で書かれた単一バイナリの DNS サーバーです
 
 ```bash
 # CoreDNS のダウンロード
-CORE_VERSION="1.11.1"
+CORE_VERSION="1.13.2"
 curl -L "https://github.com/coredns/coredns/releases/download/v${CORE_VERSION}/coredns_${CORE_VERSION}_linux_amd64.tgz" -o coredns.tgz
 
 # 展開と配置
@@ -70,11 +72,13 @@ VM1 は親ドメイン `sokoide.com` を管理します。また、子ドメイ�
 **VM1 (`192.168.100.10`) で実行:**
 
 1. 作業ディレクトリ作成
+
    ```bash
    mkdir -p ~/coredns_parent && cd ~/coredns_parent
    ```
 
 2. **Corefile** (設定ファイル) 作成
+
    ```bash
    cat <<'EOF' > Corefile
    sokoide.com:10053 {
@@ -93,6 +97,7 @@ VM1 は親ドメイン `sokoide.com` を管理します。また、子ドメイ�
    ```
 
 3. **ゾーンファイル** (レコード定義) 作成
+
    ```bash
    cat <<'EOF' > db.sokoide.com
    $ORIGIN sokoide.com.
@@ -115,11 +120,13 @@ VM2 はサブドメイン `foo.sokoide.com` を管理します。ここには具
 **VM2 (`192.168.100.20`) で実行:**
 
 1. 作業ディレクトリ作成
+
    ```bash
    mkdir -p ~/coredns_child && cd ~/coredns_child
    ```
 
 2. **Corefile** 作成
+
    ```bash
    cat <<'EOF' > Corefile
    foo.sokoide.com:10053 {
@@ -131,6 +138,7 @@ VM2 はサブドメイン `foo.sokoide.com` を管理します。ここには具
    ```
 
 3. **ゾーンファイル** 作成
+
    ```bash
    cat <<'EOF' > db.foo.sokoide.com
    $ORIGIN foo.sokoide.com.
@@ -151,12 +159,14 @@ VM2 はサブドメイン `foo.sokoide.com` を管理します。ここには具
 それぞれの VM で CoreDNS を起動します。ログを確認するため、このターミナルは開いたままにしてください（または `screen`/`tmux` やバックグラウンド実行 `&` を利用）。
 
 **VM1 (Parent) ターミナル:**
+
 ```bash
 cd ~/coredns_parent
 sudo /usr/local/bin/coredns -conf Corefile
 ```
 
 **VM2 (Child) ターミナル:**
+
 ```bash
 cd ~/coredns_child
 sudo /usr/local/bin/coredns -conf Corefile
@@ -169,14 +179,17 @@ sudo /usr/local/bin/coredns -conf Corefile
 別のターミナル（またはローカル PC）から `dig` コマンドを使って検証します。
 
 ### 1. 親ゾーンの正引き
+
 親サーバー (VM1) に `www.sokoide.com` を問い合わせます。
 
 ```bash
 dig @192.168.100.10 -p 10053 www.sokoide.com +short
 ```
+
 > **結果:** `1.1.1.1` が返れば成功。
 
 ### 2. 子ゾーンの解決 (Forwarding)
+
 親サーバー (VM1) に、子ゾーンにある `test.foo.sokoide.com` を問い合わせます。
 
 ```bash
@@ -184,6 +197,7 @@ dig @192.168.100.10 -p 10053 test.foo.sokoide.com
 ```
 
 **出力の読み方:**
+
 ```text
 ;; ANSWER SECTION:
 test.foo.sokoide.com.   3600    IN      A       2.2.2.2  <-- 正しいIP (VM2から取得)
@@ -192,6 +206,7 @@ test.foo.sokoide.com.   3600    IN      A       2.2.2.2  <-- 正しいIP (VM2か
 ```
 
 ### 何が起きたか？
+
 1. クライアントは VM1 (`sokoide.com`) に問い合わせた。
 2. VM1 は設定 (`forward . 192.168.100.20`) に従い、VM2 に問い合わせを転送した。
 3. VM2 が `2.2.2.2` と回答した。
@@ -207,6 +222,7 @@ VM1 のログを見ると、転送が行われた様子（ログ出力設定に�
 
 1. **プロセス停止:** 各 VM で起動している `coredns` を `Ctrl+C` で停止します。
 2. **ファイル削除:**
+
    ```bash
    # 両方の VM で
    rm -rf ~/coredns_parent ~/coredns_child

@@ -21,6 +21,7 @@ Build and understand the following configuration **hands-on**.
 ```
 
 **What you will learn:**
+
 1. **Authoritative DNS Server:** A server that holds information for its own domain (zone) and answers queries.
 2. **Forwarding:** A mechanism to forward queries for unknown domains to another server.
 3. **Zone Hierarchy:** The relationship between a parent (`sokoide.com`) and a child (`foo.sokoide.com`).
@@ -30,12 +31,13 @@ Build and understand the following configuration **hands-on**.
 ## Prerequisites
 
 - **2 VMs** (Ubuntu 24.04 recommended)
-    - **VM1 (Parent):** IP `192.168.100.10`
-    - **VM2 (Child):** IP `192.168.100.20`
-    - *Note:* If your IP addresses are different, please replace the IPs in the following steps accordingly.
+  - **VM1 (Parent):** IP `192.168.100.10`
+  - **VM2 (Child):** IP `192.168.100.20`
+  - *Note:* If your IP addresses are different, please replace the IPs in the following steps accordingly.
 - **Tools:** `curl`, `tar`, `dig` (dnsutils)
 
 **Preparation (Execute on both VMs):**
+
 ```bash
 sudo apt update && sudo apt install -y curl tar dnsutils
 ```
@@ -50,7 +52,7 @@ CoreDNS is a DNS server written in Go as a single binary. It has no dependencies
 
 ```bash
 # Download CoreDNS
-CORE_VERSION="1.11.1"
+CORE_VERSION="1.13.2"
 curl -L "https://github.com/coredns/coredns/releases/download/v${CORE_VERSION}/coredns_${CORE_VERSION}_linux_amd64.tgz" -o coredns.tgz
 
 # Extract and place
@@ -70,11 +72,13 @@ VM1 manages the parent domain `sokoide.com`. Also, configure it to forward queri
 **Execute on VM1 (`192.168.100.10`):**
 
 1. Create working directory
+
    ```bash
    mkdir -p ~/coredns_parent && cd ~/coredns_parent
    ```
 
 2. Create **Corefile** (Configuration file)
+
    ```bash
    cat <<'EOF' > Corefile
    sokoide.com:10053 {
@@ -93,6 +97,7 @@ VM1 manages the parent domain `sokoide.com`. Also, configure it to forward queri
    ```
 
 3. Create **Zone file** (Record definitions)
+
    ```bash
    cat <<'EOF' > db.sokoide.com
    $ORIGIN sokoide.com.
@@ -115,11 +120,13 @@ VM2 manages the subdomain `foo.sokoide.com`. Register specific records (e.g., `t
 **Execute on VM2 (`192.168.100.20`):**
 
 1. Create working directory
+
    ```bash
    mkdir -p ~/coredns_child && cd ~/coredns_child
    ```
 
 2. Create **Corefile**
+
    ```bash
    cat <<'EOF' > Corefile
    foo.sokoide.com:10053 {
@@ -131,6 +138,7 @@ VM2 manages the subdomain `foo.sokoide.com`. Register specific records (e.g., `t
    ```
 
 3. Create **Zone file**
+
    ```bash
    cat <<'EOF' > db.foo.sokoide.com
    $ORIGIN foo.sokoide.com.
@@ -151,12 +159,14 @@ VM2 manages the subdomain `foo.sokoide.com`. Register specific records (e.g., `t
 Start CoreDNS on each VM. Keep this terminal open to check logs (or use `screen`/`tmux` or background execution `&`).
 
 **VM1 (Parent) Terminal:**
+
 ```bash
 cd ~/coredns_parent
 sudo /usr/local/bin/coredns -conf Corefile
 ```
 
 **VM2 (Child) Terminal:**
+
 ```bash
 cd ~/coredns_child
 sudo /usr/local/bin/coredns -conf Corefile
@@ -169,14 +179,17 @@ sudo /usr/local/bin/coredns -conf Corefile
 Verify using the `dig` command from another terminal (or local PC).
 
 ### 1. Direct Lookup of Parent Zone
+
 Query `www.sokoide.com` to the parent server (VM1).
 
 ```bash
 dig @192.168.100.10 -p 10053 www.sokoide.com +short
 ```
+
 > **Result:** Success if `1.1.1.1` is returned.
 
 ### 2. Child Zone Resolution (Forwarding)
+
 Query `test.foo.sokoide.com` (which is in the child zone) to the parent server (VM1).
 
 ```bash
@@ -184,6 +197,7 @@ dig @192.168.100.10 -p 10053 test.foo.sokoide.com
 ```
 
 **How to read the output:**
+
 ```text
 ;; ANSWER SECTION:
 test.foo.sokoide.com.   3600    IN      A       2.2.2.2  <-- Correct IP (Fetched from VM2)
@@ -192,6 +206,7 @@ test.foo.sokoide.com.   3600    IN      A       2.2.2.2  <-- Correct IP (Fetched
 ```
 
 ### What happened?
+
 1. The client queried VM1 (`sokoide.com`).
 2. VM1 forwarded the query to VM2 according to the configuration (`forward . 192.168.100.20`).
 3. VM2 answered `2.2.2.2`.
@@ -207,6 +222,7 @@ Cleanup after the workshop.
 
 1. **Stop processes:** Stop running `coredns` on each VM with `Ctrl+C`.
 2. **Delete files:**
+
    ```bash
    # On both VMs
    rm -rf ~/coredns_parent ~/coredns_child

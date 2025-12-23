@@ -132,6 +132,18 @@ sudo podman network ls
 # net-vlan10 and net-vlan20 should be displayed
 ```
 
+> **📝 Note: CIDR Notation (`/24`) and macvlan**
+>
+> **CIDR (Classless Inter-Domain Routing):**
+> `/24` is a notation representing an IP address range. It means the first 24 bits of the 32-bit IP address represent the "Network Address" (the street), and the remaining 8 bits represent the "Host Address" (the house number).
+> For `/24`, the host portion has $2^8 = 256$ addresses. However, since the first (Network address) and last (Broadcast address) are reserved, **254** addresses are actually available for use.
+> - Network: `192.168.10.0`
+> - Host Range: `192.168.10.1` to `192.168.10.254`
+>
+> **macvlan:**
+> A Linux kernel feature that allows a single physical NIC to have multiple distinct MAC addresses.
+> To the container, it appears as if it has "its own physical cable plugged into a switch." This enables high-performance network isolation (L2 isolation) with very low overhead.
+
 ---
 
 ## Step 3. Build the Router Container
@@ -196,6 +208,16 @@ iptables -A FORWARD -i eth1 -o eth2 -j ACCEPT
 iptables -A FORWARD -i eth2 -m state --state ESTABLISHED,RELATED -j ACCEPT
 '
 ```
+
+> **📝 Note: NAT and IP Masquerade (NAPT)**
+>
+> **NAT (Network Address Translation):**
+> A general term for technologies that translate IP addresses. Typically, devices with private IP addresses (192.168.x.x) cannot communicate directly with the Internet because Internet routers do not know routes to private IPs.
+>
+> **IP Masquerade (NAPT / IP Masquerade):**
+> A type of NAT that allows multiple containers to share a single public IP address (the host's IP in this case) to communicate externally.
+> The router (this container) rewrites the "source IP" and "source port" of outgoing traffic to its own "external IP" and an "available port," records this in a translation table, and sends it out. Returning packets are forwarded back to the original container by referencing this table.
+> To the outside world, it appears as if only the router (one IP) is communicating. This is why it's called "Masquerade."
 
 ---
 
