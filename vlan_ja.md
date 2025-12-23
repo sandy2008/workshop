@@ -87,6 +87,9 @@ sudo ip link add link $IF name $IF.20 type vlan id 20
 # インタフェースを有効化
 sudo ip link set $IF.10 up
 sudo ip link set $IF.20 up
+
+# $IF.10, $IF.20 が表示されることを確認
+ip link show
 ```
 
 **解説:**
@@ -159,6 +162,15 @@ sudo podman network connect \
 sudo podman network connect podman router
 ```
 
+**確認:**
+コンテナ内のインタフェースが `eth0`, `eth1`, `eth2` の 3 つ（+ `lo`）存在することを確認します。
+
+```bash
+sudo podman exec router ip addr
+```
+
+出力に `192.168.10.1`, `192.168.20.1`, そして `10.88.x.x` (podmanデフォルト) の IP が見えれば成功です。
+
 ---
 
 ## Step 4. ルーターで NAT (IP マスカレード) を設定する
@@ -200,6 +212,16 @@ sudo podman run -d --name a \
   alpine sleep infinity
 ```
 
+**確認:**
+
+```bash
+# 1. IPアドレスが正しく割り当てられているか
+sudo podman exec a ip addr show eth0
+
+# 2. ゲートウェイ（router）に Ping が届くか
+sudo podman exec a ping -c 3 192.168.10.1
+```
+
 ### Container B (VLAN 20)
 
 ```bash
@@ -207,6 +229,16 @@ sudo podman run -d --name b \
   --network net-vlan20 \
   --ip 192.168.20.20 \
   alpine sleep infinity
+```
+
+**確認:**
+
+```bash
+# 1. IPアドレスの確認
+sudo podman exec b ip addr show eth0
+
+# 2. ゲートウェイ（router）に Ping が届くか
+sudo podman exec b ping -c 3 192.168.20.1
 ```
 
 ---
@@ -238,10 +270,13 @@ sudo podman exec b ping -c 3 192.168.10.10
 Container A からインターネット上のリソースにアクセスできるか確認します。
 
 ```bash
-# curl をインストールしてみる（インターネット接続が必要）
-sudo podman exec a apk add --no-cache curl
+# curl と dig (bind-tools) をインストールしてみる（インターネット接続が必要）
+sudo podman exec a apk add --no-cache curl bind-tools
 
-# Google へアクセス
+# DNS の確認
+sudo podman exec a dig www.google.com
+
+# HTTP の確認
 sudo podman exec a curl -I https://www.google.com
 # HTTP/2 200 ... などのレスポンスがあればOK
 ```
