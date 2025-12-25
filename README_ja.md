@@ -20,4 +20,7 @@
 
 ### ソフトウェア・アーキテクチャ関連
 
+- [クリーンアーキテクチャ (3レイヤー構成)](./software/clean_arch_ja.md)
+- [クリーンアーキテクチャ実習 (WS1): 変更に強い設計を学ぶ](./software/clean_arch_ws1_ja.md)
+- [クリーンアーキテクチャ実習 (WS2): 拡張と最適化](./software/clean_arch_ws2_ja.md)
 - [Design Patterns](https://github.com/sokoide/design-patterns/README_ja.md)

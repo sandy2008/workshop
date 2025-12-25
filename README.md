@@ -20,4 +20,7 @@ This repository stores hands-on materials for various technical topics.
 
 ### Software Architecture
 
-- [Design Patterns](<https://github.com/sokoide/design-patterns>
+- [Clean Architecture (3-Layer Structure)](./software/clean_arch_en.md)
+- [Clean Architecture Workshop (WS1): Learning Resilient Design](./software/clean_arch_ws1_en.md)
+- [Clean Architecture Workshop (WS2): Extension and Optimization](./software/clean_arch_ws2_en.md)
+- [Design Patterns](https://github.com/sokoide/design-patterns)
