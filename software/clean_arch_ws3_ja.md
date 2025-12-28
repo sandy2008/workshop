@@ -1,6 +1,7 @@
 # クリーンアーキテクチャ実習: advent-calm-2025
 
 このワークショップでは、Go言語を用いて「Clean Architecture」に基づいた堅牢でテスト容易なアプリケーションを構築する方法を学びます。
+完全なプロジェクトファイルは [advent-of-calm-2025](./advent-of-calm-2025/) ディレクトリにあります。
 
 ## 1. Clean Architecture とは？
 

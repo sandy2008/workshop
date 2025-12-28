@@ -1,4 +1,4 @@
-# iSCSIとKubernetes PersistentVolumeワークショップ
+# iSCSIとKubernetes PersistentVolume 実習
 
 ## はじめに
 

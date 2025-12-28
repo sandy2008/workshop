@@ -9,9 +9,9 @@ Kubernetes の `Service (Type: LoadBalancer)` や `MetalLB` が、裏側でど�
 
 具体的には、以下のネットワーク構成の役割を理解し、その間の通信を制御します。
 
--   **`192.168.10.0/24` (VLAN 10):** ユーザーがアクセスする「公開ネットワーク」として扱います。
--   **`192.168.20.0/24` (VLAN 20):** Kubernetes の Pod が稼働する「内部ネットワーク（Pod ネットワーク）」として扱います。
--   **`192.168.10.100`:** 公開ネットワーク上に作成する仮想 IP（VIP）で、これが外部からの唯一のアクセス窓口となります。
+- **`192.168.10.0/24` (VLAN 10):** ユーザーがアクセスする「公開ネットワーク」として扱います。
+- **`192.168.20.0/24` (VLAN 20):** Kubernetes の Pod が稼働する「内部ネットワーク（Pod ネットワーク）」として扱います。
+- **`192.168.10.100`:** 公開ネットワーク上に作成する仮想 IP（VIP）で、これが外部からの唯一のアクセス窓口となります。
 
 ```mermaid
 graph LR
@@ -58,7 +58,7 @@ graph LR
 
 ## 前提条件
 
--   `vlan_ja.md` の Step 6 まで完了し、コンテナ `a`, `b`, `router` が起動していること。
+- `vlan_ja.md` の Step 6 まで完了し、コンテナ `a`, `b`, `router` が起動していること。
 
 ---
 
@@ -193,24 +193,24 @@ sudo podman exec router iptables -D FORWARD -i eth1 -o eth2 -j DROP
 
 この種の Python コードは、`kubectl`でできることの多くをプログラムとして実行可能にします。
 
--   **リソースの作成・更新 (`apply_yaml`, `manage_k8s_resource`)**
+- **リソースの作成・更新 (`apply_yaml`, `manage_k8s_resource`)**
 
-    -   `kubectl apply -f my-app.yaml`のように、YAML ファイルからリソース一式をデプロイできます。
-    -   `kubectl create deployment ...`のように、個別のリソースを作成・更新・削除できます。
-    -   CI/CD パイプラインに組み込むことで、Git へのプッシュをトリガーにアプリケーションを自動でデプロイする、といったことが実現できます。
+  - `kubectl apply -f my-app.yaml`のように、YAML ファイルからリソース一式をデプロイできます。
+  - `kubectl create deployment ...`のように、個別のリソースを作成・更新・削除できます。
+  - CI/CD パイプラインに組み込むことで、Git へのプッシュをトリガーにアプリケーションを自動でデプロイする、といったことが実現できます。
 
--   **情報取得と監視 (`list_k8s_resources`, `get_pod_logs`, `get_k8s_events`)**
+- **情報取得と監視 (`list_k8s_resources`, `get_pod_logs`, `get_k8s_events`)**
 
-    -   `kubectl get pods`や`kubectl logs my-pod`のように、クラスタ内のリソース状態やログを取得できます。
-    -   これらを使って、特定の Pod が異常な状態になったら自動でログを収集して通知する、といった監視の自動化ツールを作成できます。
+  - `kubectl get pods`や`kubectl logs my-pod`のように、クラスタ内のリソース状態やログを取得できます。
+  - これらを使って、特定の Pod が異常な状態になったら自動でログを収集して通知する、といった監視の自動化ツールを作成できます。
 
--   **マニフェストの標準化 (`generate_app_manifest`)**
+- **マニフェストの標準化 (`generate_app_manifest`)**
 
-    -   アプリケーション名や Docker イメージ名を渡すだけで、標準化された`Deployment`や`Service`の YAML を自動生成できます。
-    -   これにより、チーム内での設定のばらつきを防ぎ、一貫した品質でのデプロイが可能になります。
+  - アプリケーション名や Docker イメージ名を渡すだけで、標準化された`Deployment`や`Service`の YAML を自動生成できます。
+  - これにより、チーム内での設定のばらつきを防ぎ、一貫した品質でのデプロイが可能になります。
 
--   **クラウド連携 (`K8sClientCache`など)**
-    -   Amazon EKS のようなマネージド Kubernetes では、クラスタへの接続にクラウド独自の認証方式（この例では AWS IAM）が使われます。提示されたコードは、そうした複雑な認証を処理して、透過的に Kubernetes API を叩けるようにする仕組みも内包しています。
+- **クラウド連携 (`K8sClientCache`など)**
+  - Amazon EKS のようなマネージド Kubernetes では、クラスタへの接続にクラウド独自の認証方式（この例では AWS IAM）が使われます。提示されたコードは、そうした複雑な認証を処理して、透過的に Kubernetes API を叩けるようにする仕組みも内包しています。
 
 #### このワークショップの仕組みとの関係
 

@@ -1,6 +1,7 @@
 # Clean Architecture Workshop: advent-calm-2025
 
 In this workshop, you will learn how to build a robust and testable application using **Go** based on **Clean Architecture**.
+The complete project files are in the [advent-of-calm-2025](./advent-of-calm-2025/) directory.
 
 ## 1. What is Clean Architecture?
 

@@ -17,10 +17,12 @@ This repository stores hands-on materials for various technical topics.
 - [Podman Workshop: Building an L3 Isolated Network with macvlan + Router Container](./infra/vlan_en.md)
 - [K8s Service (LoadBalancer) Workshop: Building a Virtual LB with iptables](./infra/k8s_lb_en.md)
 - [iSCSI and Kubernetes PersistentVolume Workshop](./infra/iscsi_pv_en.md)
+- [Terraform Workshop: Basics to Practical DNS Server Construction using Podman/Docker](./infra/terraform_en.md)
 
 ### Software Architecture
 
 - [Clean Architecture (3-Layer Structure)](./software/clean_arch_en.md)
 - [Clean Architecture Workshop (WS1): Learning Resilient Design](./software/clean_arch_ws1_en.md)
 - [Clean Architecture Workshop (WS2): Extension and Optimization](./software/clean_arch_ws2_en.md)
+- [Clean Architecture Workshop (WS3): e-commerce platform](./software/clean_arch_ws3_en.md)
 - [Design Patterns](https://github.com/sokoide/design-patterns)
