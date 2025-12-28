@@ -22,7 +22,7 @@ Clean Architecture（クリーンアーキテクチャ）は、ソフトウェ�
 
 3. **インフラ層 (Infrastructure Layer)** - `infra/`
     * **役割**: 詳細な技術的実装（DB接続、外部API通信、Webフレームワーク）。
-    * **特徴**: 全ての層に依存できますが、主にドメイン層のインターフェースを実装します。
+    * **特徴**: **ドメイン層のインターフェースに依存して実装する層**です（依存は内向き）。
     * **構成要素**: リポジトリの実装 (Repository Impl), Webハンドラー, 外部クライアント。
 
 ### 依存性のルール (The Dependency Rule)
@@ -35,7 +35,7 @@ graph TD
     %% 外部要素 (Frameworks & Drivers / External)
     Customer[Customer]
     Admin[Admin]
-    
+
     subgraph Gateway [Web / API / Gateway]
         OrderAPI[Order API Endpoint]
         InvAPI[Inventory API Endpoint]
@@ -48,7 +48,7 @@ graph TD
 
     subgraph DomainLayer [Domain]
         Entities[Order/Inventory Entities]
-        RepoInt[Repository Interfaces]
+        Ports["Ports (Interfaces)"]
         OrderDS[Order Domain Svc]
         InvDS[Inventory Domain Svc]
     end
@@ -64,25 +64,25 @@ graph TD
     %% 外部からのアクセス
     Customer --> OrderAPI
     Admin --> InvAPI
-    
+
     %% APIからユースケースへ
     OrderAPI --> OrderUC
     InvAPI --> InvUC
 
     %% ユースケースからドメインへの依存
     OrderUC --> OrderDS
-    OrderUC --> RepoInt
+    OrderUC --> Ports
     InvUC --> InvDS
-    InvUC --> RepoInt
+    InvUC --> Ports
 
     %% ドメインサービスからインターフェースへの依存
-    OrderDS --> RepoInt
-    InvDS --> RepoInt
+    OrderDS --> Ports
+    InvDS --> Ports
 
     %% 依存性逆転 (DIP)
-    OrderRepoImpl -- "implements" --> RepoInt
-    InvRepoImpl -- "implements" --> RepoInt
-    InvClientImpl -- "implements" --> RepoInt
+    OrderRepoImpl -- "implements" --> Ports
+    InvRepoImpl -- "implements" --> Ports
+    InvClientImpl -- "implements" --> Ports
 
     %% 実装から外部リソースへのアクセス
     OrderRepoImpl --> OrderDB
@@ -102,6 +102,9 @@ graph TD
 > **注記: 外部インターフェースの集約**
 > `Customer`（注文者）と `Admin`（在庫管理者）は、それぞれ `Gateway` レイヤーの適切な API エンドポイントを叩きます。また、`Order Service` 内の `Inventory REST Client` も、`Admin` と同じ `Inventory API` を利用することで、在庫操作のロジックを一箇所（Inventory UseCase）に集中させています。
 
+> **Ports とは？**
+> Ports は「内側のルールが外側に求める契約（インターフェース）」です。DBや外部APIの詳細は Ports の背後に隠れ、ユースケースやドメインサービスは Ports に依存して振る舞いだけを定義します。外側（Infra）は Ports を実装することで依存方向を内向きに保ちます。
+
 ---
 
 ## ワークショップ: 注文システムの構築
@@ -115,6 +118,11 @@ graph TD
 1. **Entity**: ビジネスデータとルール（例: `Order`, `Inventory`）。
 2. **Interface**: データの永続化や外部連携のための契約（例: `OrderRepository`, `InventoryClient`）。
 3. **Domain Service**: 複数のエンティティにまたがるロジック（例: `OrderDomainService`）。
+
+**ドメインサービスのルール例**
+
+* `OrderDomainService`: ProductID が空ならエラー、数量が 0 以下ならエラー。
+* `InventoryDomainService`: ProductID が空ならエラー、在庫数量が負ならエラー。
 
 まずはビジネスのコアとなる「注文 (Order)」と、外界と対話するための契約「インターフェース」を定義します。
 
@@ -131,13 +139,14 @@ type Order struct {
 }
 ```
 
-**2. インターフェースの定義 (`domain/repository/interfaces.go`)**
+**2. インターフェース（Ports）の定義 (`domain/repository/interfaces.go`)**
 データの保存や外部サービスへのアクセス方法を**抽象化**します。ここで定義したインターフェースの実装は、Step 3で行います。
 
 ```go
 // 依存性逆転の原則 (DIP): 上位モジュールがインターフェースを所有する
 type OrderRepository interface {
     Save(ctx context.Context, order *entity.Order) error
+    FindByID(ctx context.Context, id string) (*entity.Order, error)
 }
 
 type InventoryClient interface {
@@ -148,6 +157,9 @@ type PaymentPublisher interface {
     PublishPaymentTask(ctx context.Context, order *entity.Order) error
 }
 ```
+
+> **補足: context.Context の扱い**
+> Go では Ports に `context.Context` を渡す実装も一般的ですが、**純粋性を優先するなら usecase 層で止める**設計もあります。教材としては用途に応じたトレードオフとして理解してください。
 
 ### Step 2: ユースケース層の実装 (`usecase/`)
 
@@ -169,7 +181,10 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 }
 ```
 
-ここでのポイントは、`CreateOrderUsecase` が具体的なデータベース（Postgresなど）を知らないことです。知っているのは `OrderRepository` というインターフェースだけです。
+ここでのポイントは、`CreateOrderUsecase` が具体的なデータベース（Postgresなど）を知らないことです。知っているのは Ports（`OrderRepository` など）のみです。
+
+> **補足: 取引の一貫性（DB保存とMQ発行）**
+> この例では「DB保存 → MQ発行」を順に実行しています。現実のシステムでは、トランザクション境界や補償（Outboxパターン等）を検討し、二重送信や送信漏れを防ぐ設計が必要です。
 
 ### Step 3: インフラ層の実装 (`infra/`)
 

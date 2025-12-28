@@ -1,4 +1,4 @@
-# Clean Architecture Workshop): advent-calm-2025
+# Clean Architecture Workshop: advent-calm-2025
 
 In this workshop, you will learn how to build a robust and testable application using **Go** based on **Clean Architecture**.
 
@@ -22,20 +22,20 @@ This workshop adopts a simple and practical **3-layer structure**.
 
 3. **Infrastructure Layer** - `infra/`
     * **Role**: Detailed technical implementations (DB connections, external API calls, web frameworks).
-    * **Characteristics**: Can depend on all layers, but primarily implements interfaces defined in the Domain Layer.
+    * **Characteristics**: **Implements the interfaces defined in the Domain Layer** (dependencies point inward).
     * **Components**: Repository implementations, Web handlers, External clients.
 
 ### The Dependency Rule
 
 **"Dependencies always point inwards (towards the Domain)."**
-Source code dependencies must always point from lower-level details to higher-level abstractions.
+Source code dependencies must always point from lower-level details (concrete implementations) to higher-level abstractions.
 
 ```mermaid
 graph TD
     %% External / Frameworks & Drivers
     Customer[Customer]
     Admin[Admin]
-    
+
     subgraph Gateway [Web / API / Gateway]
         OrderAPI[Order API Endpoint]
         InvAPI[Inventory API Endpoint]
@@ -48,7 +48,7 @@ graph TD
 
     subgraph DomainLayer [Domain]
         Entities[Order/Inventory Entities]
-        RepoInt[Repository Interfaces]
+        Ports["Ports (Interfaces)"]
         OrderDS[Order Domain Svc]
         InvDS[Inventory Domain Svc]
     end
@@ -64,25 +64,25 @@ graph TD
     %% External Access
     Customer --> OrderAPI
     Admin --> InvAPI
-    
+
     %% API to Usecase
     OrderAPI --> OrderUC
     InvAPI --> InvUC
 
     %% Usecase to Domain Dependency
     OrderUC --> OrderDS
-    OrderUC --> RepoInt
+    OrderUC --> Ports
     InvUC --> InvDS
-    InvUC --> RepoInt
+    InvUC --> Ports
 
     %% Domain Service to Interface Dependency
-    OrderDS --> RepoInt
-    InvDS --> RepoInt
+    OrderDS --> Ports
+    InvDS --> Ports
 
     %% Dependency Inversion (DIP)
-    OrderRepoImpl -- "implements" --> RepoInt
-    InvRepoImpl -- "implements" --> RepoInt
-    InvClientImpl -- "implements" --> RepoInt
+    OrderRepoImpl -- "implements" --> Ports
+    InvRepoImpl -- "implements" --> Ports
+    InvClientImpl -- "implements" --> Ports
 
     %% Implementation to External Resources
     OrderRepoImpl --> OrderDB
@@ -100,7 +100,10 @@ graph TD
 ```
 
 > **Note: Unifying External Interfaces**
-> Both the `Customer` and `Admin` interact with the system via the appropriate API endpoints in the `Gateway` layer. By having the `Inventory REST Client` (within the Order Service) use the same `Inventory API` as the `Admin`, we centralize all inventory-related logic within the `Inventory UseCase`.
+> `Customer` (the person ordering) and `Admin` (inventory manager) interact with the system via the appropriate API endpoints in the `Gateway` layer. Furthermore, the `Inventory REST Client` within the `Order Service` uses the same `Inventory API` as the `Admin`, centralizing all inventory-related logic within the `Inventory Usecase`.
+
+> **What are "Ports"?**
+> Ports are the "contracts (interfaces) that the inner rules demand from the outside." Details about the DB or external APIs are hidden behind Ports. Usecases and Domain Services depend on Ports to define behavior only. The outside layer (Infra) implements these Ports, keeping the dependency direction pointing inward.
 
 ---
 
@@ -115,6 +118,11 @@ The Domain Layer is the **heart** of the application and consists of the followi
 1. **Entity**: Business data and rules (e.g., `Order`, `Inventory`).
 2. **Interface**: Contracts for data persistence or external integration (e.g., `OrderRepository`, `InventoryClient`).
 3. **Domain Service**: Logic that spans multiple entities (e.g., `OrderDomainService`).
+
+**Domain Service Rule Examples**
+
+* `OrderDomainService`: Error if `ProductID` is empty, or if quantity is 0 or less.
+* `InventoryDomainService`: Error if `ProductID` is empty, or if stock quantity is negative.
 
 First, we define the core business object, the "Order," and the "Interfaces" used to interact with the outside world.
 
@@ -131,13 +139,14 @@ type Order struct {
 }
 ```
 
-**2. Define Interfaces (`domain/repository/interfaces.go`)**
+**2. Define Interfaces (Ports) (`domain/repository/interfaces.go`)**
 **Abstract** how data is saved or how external services are accessed. The implementation of these interfaces will be done in Step 3.
 
 ```go
 // Dependency Inversion Principle (DIP): High-level modules own the abstractions.
 type OrderRepository interface {
     Save(ctx context.Context, order *entity.Order) error
+    FindByID(ctx context.Context, id string) (*entity.Order, error)
 }
 
 type InventoryClient interface {
@@ -148,6 +157,9 @@ type PaymentPublisher interface {
     PublishPaymentTask(ctx context.Context, order *entity.Order) error
 }
 ```
+
+> **Note: Handling context.Context**
+> In Go, it is common to pass `context.Context` to Ports. However, some designs prefer to **keep it within the Usecase layer** to prioritize purity. Understand this as a trade-off depending on the application's needs.
 
 ### Step 2: Implementing the Usecase Layer (`usecase/`)
 
@@ -169,7 +181,10 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 }
 ```
 
-The key point here is that `CreateOrderUsecase` does not know about the concrete database (e.g., Postgres). It only knows the `OrderRepository` interface.
+The key point here is that `CreateOrderUsecase` does not know about the concrete database (e.g., Postgres). It only knows the Ports (e.g., `OrderRepository`).
+
+> **Note: Transactional Consistency (DB Save vs. MQ Publish)**
+> In this example, "DB Save -> MQ Publish" are executed sequentially. In real-world systems, you should consider transaction boundaries and compensation (e.g., the Outbox pattern) to prevent double-sends or missing messages.
 
 ### Step 3: Implementing the Infrastructure Layer (`infra/`)
 
