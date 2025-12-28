@@ -1,0 +1,744 @@
+{
+  "$schema": "https://calm.finos.org/release/1.1/meta/calm.json",
+  "adrs": [
+    "docs/adr/0001-use-message-queue-for-async-processing.md",
+    "docs/adr/0002-use-oauth2-for-api-authentication.md"
+  ],
+  "unique-id": "ecommerce-platform-architecture",
+  "name": "E-Commerce Order Processing Platform",
+  "description": "A complete architecture for an e-commerce order processing system.",
+  "metadata": {
+    "created": "2025-12-26",
+    "description": "E-commerce order processing platform architecture demo.",
+    "monitoring": {
+      "grafana-dashboard": "https://grafana.example.com/d/ecommerce-overview",
+      "kibana-logs": "https://kibana.example.com/app/discover#/ecommerce-*",
+      "log-retention": "90 days",
+      "metrics-retention": "30 days",
+      "pagerduty-service": "https://pagerduty.example.com/services/ECOMMERCE",
+      "statuspage": "https://status.example.com"
+    },
+    "owner": "Architecture Team",
+    "tags": ["ecommerce", "microservices", "orders"],
+    "version": "1.0.0"
+  },
+  "controls": {
+    "high-availability": {
+      "description": "System-wide uptime and availability requirements",
+      "requirements": [
+        {
+          "requirement-url": "https://internal-policy.example.com/resilience/availability-sla",
+          "config": {
+            "monitoring-interval-seconds": 60,
+            "uptime-percentage": 99.9
+          }
+        }
+      ]
+    },
+    "performance": {
+      "description": "System-wide performance and scalability requirements",
+      "requirements": [
+        {
+          "requirement-url": "https://internal-policy.example.com/performance/response-time-sla",
+          "config": {
+            "p95-latency-ms": 100,
+            "p99-latency-ms": 200
+          }
+        },
+        {
+          "requirement-url": "https://internal-policy.example.com/performance/availability-target",
+          "config-url": "https://configs.example.com/infra/ha-config.yaml"
+        }
+      ]
+    },
+    "security": {
+      "description": "Data encryption and secure communication requirements",
+      "requirements": [
+        {
+          "requirement-url": "https://internal-policy.example.com/security/encryption-at-rest",
+          "config": {
+            "algorithm": "AES-256",
+            "scope": "all-data-stores"
+          }
+        },
+        {
+          "requirement-url": "https://internal-policy.example.com/security/tls-1-3-minimum",
+          "config-url": "https://configs.example.com/security/tls-config.yaml"
+        }
+      ]
+    }
+  },
+  "flows": [
+    {
+      "unique-id": "order-processing-flow",
+      "name": "Customer Order Processing",
+      "description": "End-to-end flow from customer placing an order to payment confirmation",
+      "metadata": {
+        "business-impact": "Customers cannot complete purchases - direct revenue loss",
+        "customer-communication": "Display 'Order processing delayed' message",
+        "degraded-behavior": "Orders queue in message broker; processed when service recovers",
+        "sla": "99.9% availability, 30s p99 latency"
+      },
+      "transitions": [
+        {
+          "relationship-unique-id": "customer-connects-order",
+          "sequence-number": 1,
+          "description": "API Gateway Instance 1 routes to Order Service",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "order-publishes-to-queue",
+          "sequence-number": 2,
+          "description": "Order Service publishes payment task",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "payment-subscribes-to-queue",
+          "sequence-number": 3,
+          "description": "Payment Service processes task from queue",
+          "direction": "source-to-destination"
+        }
+      ]
+    },
+    {
+      "unique-id": "inventory-check-flow",
+      "name": "Inventory Stock Check",
+      "description": "Admin checks and updates inventory stock levels",
+      "metadata": {
+        "business-impact": "Stock levels may be inaccurate - risk of overselling",
+        "customer-communication": "Display 'Stock availability being confirmed'",
+        "degraded-behavior": "Fall back to cached inventory; flag orders for manual review",
+        "sla": "99.5% availability, 500ms p99 latency"
+      },
+      "transitions": [
+        {
+          "relationship-unique-id": "admin-interacts-inventory",
+          "sequence-number": 1,
+          "description": "Admin requests inventory status",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "inventory-connects-db",
+          "sequence-number": 2,
+          "description": "Query current stock levels",
+          "direction": "source-to-destination"
+        },
+        {
+          "relationship-unique-id": "inventory-connects-db",
+          "sequence-number": 3,
+          "description": "Return stock data",
+          "direction": "destination-to-source"
+        },
+        {
+          "relationship-unique-id": "gateway-2-connects-inventory",
+          "sequence-number": 4,
+          "description": "Return inventory report",
+          "direction": "destination-to-source"
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "customer",
+      "node-type": "actor",
+      "name": "Customer",
+      "description": "A user who browses and purchases products.",
+      "costCenter": "CC-1000",
+      "owner": "marketing-team",
+      "metadata": {
+        "owner": "marketing-team"
+      }
+    },
+    {
+      "unique-id": "admin",
+      "node-type": "actor",
+      "name": "Admin",
+      "description": "A staff member who manages products and orders.",
+      "costCenter": "CC-1000",
+      "owner": "ops-team",
+      "metadata": {
+        "owner": "ops-team"
+      }
+    },
+    {
+      "unique-id": "ecommerce-system",
+      "node-type": "system",
+      "name": "E-Commerce Platform",
+      "description": "The overall e-commerce system containing microservices.",
+      "costCenter": "CC-2000",
+      "owner": "platform-team",
+      "metadata": {
+        "owner": "platform-team"
+      }
+    },
+    {
+      "unique-id": "order-service",
+      "node-type": "service",
+      "name": "Order Service",
+      "description": "Handles order creation and lifecycle management.",
+      "costCenter": "CC-3000",
+      "owner": "orders-team",
+      "metadata": {
+        "alerts": ["OrderCreationFailureRate", "OrderDBConectionExhausted"],
+        "business-criticality": "high",
+        "dashboard": "https://grafana.example.com/d/order-service-metrics",
+        "dependencies": [
+          "order-database-cluster",
+          "inventory-service",
+          "message-broker"
+        ],
+        "deployment-type": "container",
+        "failure-modes": [
+          {
+            "check": "Check connection pool metrics in Grafana dashboard",
+            "escalation": "If persists \u003e 5min, page DBA team",
+            "likely-cause": "Database connection pool exhausted",
+            "remediation": "Scale up service replicas or increase pool size",
+            "symptom": "HTTP 503 errors"
+          },
+          {
+            "check": "Check payment-service health and circuit breaker status",
+            "escalation": "Contact payments-team if circuit breaker not triggering",
+            "likely-cause": "Payment service degradation",
+            "remediation": "Circuit breaker should open automatically; check fallback queue",
+            "symptom": "High latency (\u003e2s p99)"
+          },
+          {
+            "check": "Verify inventory-service cache TTL and database replication lag",
+            "escalation": "Contact platform-team for cache issues",
+            "likely-cause": "Inventory service returning stale data",
+            "remediation": "Clear inventory cache; check replica sync status",
+            "symptom": "Order validation failures"
+          }
+        ],
+        "health-endpoint": "/actuator/health",
+        "log-query": "app:order-service AND level:ERROR",
+        "oncall-slack": "#oncall-orders",
+        "owner": "orders-team",
+        "repository": "https://github.com/example/order-service",
+        "runbook": "https://runbooks.example.com/order-service",
+        "sla-tier": "tier-1",
+        "tech-owner": "Order Team",
+        "tier": "tier-1"
+      },
+      "controls": {
+        "circuit-breaker": {
+          "description": "Fault tolerance for downstream service calls",
+          "requirements": [
+            {
+              "requirement-url": "https://internal-policy.example.com/resilience/circuit-breaker-policy",
+              "config": {
+                "failure-threshold-percentage": 50,
+                "minimum-calls-before-opening": 10,
+                "wait-duration-seconds": 30
+              }
+            }
+          ]
+        }
+      },
+      "interfaces": [
+        {
+          "unique-id": "order-api",
+          "name": "Order API",
+          "protocol": "REST",
+          "port": 8080
+        },
+        {
+          "unique-id": "order-db-write-client",
+          "name": "Order DB Write Client",
+          "protocol": "JDBC",
+          "description": "Writes to the primary database."
+        },
+        {
+          "unique-id": "order-db-read-client",
+          "name": "Order DB Read Client",
+          "protocol": "JDBC",
+          "description": "Reads from the replica database."
+        },
+        {
+          "unique-id": "payment-publisher",
+          "protocol": "AMQP",
+          "description": "Publishes order messages for payment processing."
+        },
+        {
+          "unique-id": "order-inventory-client",
+          "protocol": "REST",
+          "description": "Outbound connection to check inventory"
+        },
+        {
+          "unique-id": "order-health",
+          "name": "Health Check",
+          "protocol": "HTTP",
+          "path": "/health"
+        }
+      ]
+    },
+    {
+      "unique-id": "inventory-service",
+      "node-type": "service",
+      "name": "Inventory Service",
+      "description": "Manages product stock levels.",
+      "costCenter": "CC-4000",
+      "owner": "inventory-team",
+      "metadata": {
+        "alerts": ["InventoryCacheInconsistency", "StockUpdateFailure"],
+        "business-criticality": "high",
+        "dashboard": "https://grafana.example.com/d/inventory-metrics",
+        "dependencies": ["inventory-db"],
+        "deployment-type": "container",
+        "failure-modes": [
+          {
+            "check": "Check DB lock metrics and slow query log",
+            "escalation": "Contact DBA team for lock contention",
+            "likely-cause": "Deadlock on stock updates",
+            "remediation": "Review transaction isolation level or retry logic",
+            "symptom": "Inventory sync failures"
+          },
+          {
+            "check": "Verify Redis/Memcached availability and evictions",
+            "escalation": "Contact platform-team for cache infrastructure",
+            "likely-cause": "Cache invalidation failure",
+            "remediation": "Flush cache for affected products",
+            "symptom": "Stale stock levels"
+          }
+        ],
+        "health-endpoint": "/health",
+        "log-query": "app:inventory-service",
+        "oncall-slack": "#oncall-inventory",
+        "owner": "inventory-team",
+        "repository": "https://github.com/example/inventory-service",
+        "runbook": "https://runbooks.example.com/inventory-service",
+        "tech-owner": "Warehouse Team",
+        "tier": "tier-2"
+      },
+      "interfaces": [
+        {
+          "unique-id": "inventory-api",
+          "name": "Inventory API",
+          "protocol": "REST",
+          "port": 8081
+        },
+        {
+          "unique-id": "inventory-db-client",
+          "protocol": "JDBC"
+        },
+        {
+          "unique-id": "inventory-health",
+          "name": "Health Check",
+          "protocol": "HTTP",
+          "path": "/health"
+        }
+      ]
+    },
+    {
+      "unique-id": "payment-service",
+      "node-type": "service",
+      "name": "Payment Service",
+      "description": "Integrates with external payment providers.",
+      "costCenter": "CC-5000",
+      "owner": "payments-team",
+      "metadata": {
+        "alerts": ["PaymentGatewayTimeout", "PCIViolationAttempt"],
+        "business-criticality": "high",
+        "dashboard": "https://grafana.example.com/d/payment-metrics",
+        "dependencies": ["external-payment-provider"],
+        "deployment-type": "serverless",
+        "failure-modes": [
+          {
+            "check": "Verify external gateway status page",
+            "escalation": "Escalate to provider support",
+            "likely-cause": "External payment gateway latency",
+            "remediation": "Enable aggressive retry for idempotent calls",
+            "symptom": "Payment processing timeouts"
+          },
+          {
+            "check": "Review access logs for unusual patterns",
+            "escalation": "Contact security-team",
+            "likely-cause": "API Key leaked or compromised",
+            "remediation": "Rotate API keys immediately",
+            "symptom": "Unauthorized transaction spikes"
+          }
+        ],
+        "health-endpoint": "/health",
+        "log-query": "app:payment-service",
+        "oncall-slack": "#oncall-payments",
+        "owner": "payments-team",
+        "repository": "https://github.com/example/payment-service",
+        "runbook": "https://runbooks.example.com/payment-service",
+        "tech-owner": "Payment Team",
+        "tier": "tier-1"
+      },
+      "controls": {
+        "compliance": {
+          "description": "PCI-DSS compliance for payment processing",
+          "requirements": [
+            {
+              "requirement-url": "https://www.pcisecuritystandards.org/documents/PCI-DSS-v4.0",
+              "config-url": "https://configs.example.com/compliance/pci-dss-config.json"
+            }
+          ]
+        }
+      },
+      "interfaces": [
+        {
+          "unique-id": "payment-api",
+          "name": "Payment Processing API",
+          "protocol": "REST",
+          "port": 8082
+        },
+        {
+          "unique-id": "payment-consumer",
+          "protocol": "AMQP",
+          "description": "Consumes order messages for payment processing."
+        },
+        {
+          "unique-id": "payment-health",
+          "name": "Health Check",
+          "protocol": "HTTP",
+          "path": "/health"
+        }
+      ]
+    },
+    {
+      "unique-id": "message-broker",
+      "node-type": "system",
+      "name": "Message Broker (RabbitMQ)",
+      "description": "Central messaging system for failure isolation and async processing.",
+      "costCenter": "CC-2000",
+      "owner": "platform-team",
+      "metadata": {
+        "adr": "docs/adr/0001-use-message-queue-for-async-processing.md",
+        "alerts": ["RabbitMQQueueSizeHigh", "RabbitMQConsumerDown"],
+        "dashboard": "https://grafana.example.com/d/rabbitmq-overview",
+        "deployment-type": "managed-service",
+        "health-endpoint": "/health",
+        "log-query": "service:rabbitmq",
+        "oncall-slack": "#oncall-platform",
+        "owner": "platform-team",
+        "runbook": "https://runbooks.example.com/rabbitmq",
+        "tech-owner": "Platform Team",
+        "tier": "tier-1"
+      },
+      "interfaces": [
+        {
+          "unique-id": "amqp-port",
+          "protocol": "AMQP",
+          "port": 5672
+        }
+      ]
+    },
+    {
+      "unique-id": "order-queue",
+      "node-type": "queue",
+      "name": "Order Payment Queue",
+      "description": "Buffer for orders awaiting payment processing.",
+      "costCenter": "CC-3000",
+      "owner": "orders-team",
+      "metadata": {
+        "owner": "orders-team"
+      }
+    },
+    {
+      "unique-id": "order-database-cluster",
+      "node-type": "system",
+      "name": "Order Database Cluster",
+      "description": "High-availability database cluster for order data.",
+      "costCenter": "CC-3000",
+      "owner": "dba-team",
+      "metadata": {
+        "owner": "dba-team"
+      },
+      "controls": {
+        "failover": {
+          "description": "Disaster recovery and failover targets",
+          "requirements": [
+            {
+              "requirement-url": "https://internal-policy.example.com/resilience/disaster-recovery-targets",
+              "config": {
+                "automatic-failover": true,
+                "rpo-minutes": 5,
+                "rto-minutes": 15
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "order-database-primary",
+      "node-type": "database",
+      "name": "Order Database (Primary)",
+      "description": "Main writable database for orders.",
+      "costCenter": "CC-3000",
+      "owner": "dba-team",
+      "metadata": {
+        "backup-schedule": "daily at 02:00 UTC",
+        "data-classification": "PII",
+        "dba-contact": "dba-team@example.com",
+        "deployment-type": "managed-service",
+        "owner": "dba-team",
+        "replication-mode": "async",
+        "restore-time": "60 minutes",
+        "role": "primary",
+        "tech-owner": "DBA Team"
+      },
+      "interfaces": [
+        {
+          "unique-id": "order-sql-primary",
+          "protocol": "JDBC",
+          "port": 5432,
+          "host": "orders-primary.example.com",
+          "database": "orders_v1"
+        }
+      ]
+    },
+    {
+      "unique-id": "order-database-replica",
+      "node-type": "database",
+      "name": "Order Database (Replica)",
+      "description": "Read-only replica for scaling read operations.",
+      "costCenter": "CC-3000",
+      "owner": "dba-team",
+      "metadata": {
+        "backup-schedule": "daily at 02:00 UTC",
+        "data-classification": "PII",
+        "dba-contact": "dba-team@example.com",
+        "deployment-type": "managed-service",
+        "owner": "dba-team",
+        "replication-mode": "async",
+        "restore-time": "60 minutes",
+        "role": "replica",
+        "tech-owner": "DBA Team"
+      },
+      "interfaces": [
+        {
+          "unique-id": "order-sql-replica",
+          "protocol": "JDBC",
+          "port": 5432,
+          "host": "orders-replica.example.com",
+          "database": "orders_v1"
+        }
+      ]
+    },
+    {
+      "unique-id": "inventory-db",
+      "node-type": "database",
+      "name": "Inventory Database",
+      "description": "Stores stock levels.",
+      "costCenter": "CC-4000",
+      "owner": "dba-team",
+      "metadata": {
+        "backup-schedule": "weekly at Sunday 03:00 UTC",
+        "dba-contact": "dba-team@example.com",
+        "deployment-type": "managed-service",
+        "owner": "dba-team",
+        "restore-time": "30 minutes",
+        "tech-owner": "DBA Team"
+      },
+      "interfaces": [
+        {
+          "unique-id": "inventory-sql",
+          "protocol": "JDBC",
+          "port": 5432,
+          "host": "inventory-db.example.com",
+          "database": "inventory_v1"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "customer-interacts-lb",
+      "description": "Customer accesses the platform.",
+      "dataClassification": "public",
+      "encrypted": true,
+      "relationship-type": {
+        "interacts": {
+          "actor": "customer",
+          "nodes": ["order-service"]
+        }
+      }
+    },
+    {
+      "unique-id": "admin-interacts-lb",
+      "description": "Admin manages the platform.",
+      "dataClassification": "internal",
+      "encrypted": true,
+      "relationship-type": {
+        "interacts": {
+          "actor": "admin",
+          "nodes": ["inventory-service"]
+        }
+      }
+    },
+    {
+      "unique-id": "order-connects-primary-db",
+      "description": "Order Service persists data to Primary Order Database.",
+      "dataClassification": "confidential",
+      "encrypted": true,
+      "metadata": {
+        "monitoring": true
+      },
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "order-service",
+            "interfaces": ["order-db-write-client"]
+          },
+          "destination": {
+            "node": "order-database-primary",
+            "interfaces": ["order-sql-primary"]
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "order-publishes-to-queue",
+      "description": "Order Service publishes payment task to queue.",
+      "dataClassification": "internal",
+      "encrypted": true,
+      "protocol": "AMQP",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "order-service",
+            "interfaces": ["payment-publisher"]
+          },
+          "destination": {
+            "node": "order-queue"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "payment-subscribes-to-queue",
+      "description": "Payment Service consumes payment task from queue.",
+      "dataClassification": "internal",
+      "encrypted": true,
+      "protocol": "AMQP",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "order-queue"
+          },
+          "destination": {
+            "node": "payment-service",
+            "interfaces": ["payment-consumer"]
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "order-connects-replica-db",
+      "description": "Order Service reads data from Replica Order Database.",
+      "dataClassification": "confidential",
+      "encrypted": true,
+      "metadata": {
+        "monitoring": true
+      },
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "order-service",
+            "interfaces": ["order-db-read-client"]
+          },
+          "destination": {
+            "node": "order-database-replica",
+            "interfaces": ["order-sql-replica"]
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "order-connects-inventory",
+      "description": "Order Service checks/reserves stock in Inventory Service.",
+      "dataClassification": "internal",
+      "encrypted": true,
+      "metadata": {
+        "circuit-breaker": true,
+        "latency-sla": "\u003c 100ms",
+        "monitoring": true
+      },
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "order-service",
+            "interfaces": ["order-inventory-client"]
+          },
+          "destination": {
+            "node": "inventory-service",
+            "interfaces": ["inventory-api"]
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "inventory-connects-db",
+      "description": "Inventory Service manages stock in Inventory Database.",
+      "dataClassification": "internal",
+      "encrypted": true,
+      "metadata": {
+        "monitoring": true
+      },
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "inventory-service",
+            "interfaces": ["inventory-db-client"]
+          },
+          "destination": {
+            "node": "inventory-db",
+            "interfaces": ["inventory-sql"]
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "broker-composition",
+      "description": "Message broker contains the order queue.",
+      "dataClassification": "internal",
+      "encrypted": false,
+      "relationship-type": {
+        "composed-of": {
+          "container": "message-broker",
+          "nodes": ["order-queue"]
+        }
+      }
+    },
+    {
+      "unique-id": "order-db-composition",
+      "description": "Primary and replica databases form the order database cluster.",
+      "dataClassification": "confidential",
+      "encrypted": true,
+      "relationship-type": {
+        "composed-of": {
+          "container": "order-database-cluster",
+          "nodes": ["order-database-primary", "order-database-replica"]
+        }
+      }
+    },
+    {
+      "unique-id": "ecommerce-system-composition",
+      "description": "The E-Commerce Platform comprises its core services and databases.",
+      "dataClassification": "internal",
+      "encrypted": false,
+      "relationship-type": {
+        "composed-of": {
+          "container": "ecommerce-system",
+          "nodes": [
+            "load-balancer",
+            "api-gateway-1",
+            "api-gateway-2",
+            "order-service",
+            "inventory-service",
+            "payment-service",
+            "order-database-cluster",
+            "inventory-db",
+            "message-broker"
+          ]
+        }
+      }
+    }
+  ]
+}
