@@ -1,4 +1,4 @@
-# Clean Architecture Go ワークショップ
+# クリーンアーキテクチャ実習: advent-calm-2025
 
 このワークショップでは、Go言語を用いて「Clean Architecture」に基づいた堅牢でテスト容易なアプリケーションを構築する方法を学びます。
 
@@ -28,41 +28,79 @@ Clean Architecture（クリーンアーキテクチャ）は、ソフトウェ�
 ### 依存性のルール (The Dependency Rule)
 
 **「依存は常に内側（ドメイン側）に向かう」**
-ソースコードの依存関係は、常に低レベル（詳細）から高レベル（抽象）へ向かいます。インフラ層はユースケースを知っていますが、ユースケースはインフラ層を知りません。
+ソースコードの依存関係は、常に低レベル（詳細）から高レベル（抽象）へ向かいます。
 
 ```mermaid
 graph TD
-    User[User/Client]
-
-    subgraph Infrastructure [Infra Layer]
-        WebHandler[Web Handler]
-        PostgresRepo[Postgres Repository]
+    %% 外部要素 (Frameworks & Drivers / External)
+    Customer[Customer]
+    Admin[Admin]
+    
+    subgraph Gateway [Web / API / Gateway]
+        OrderAPI[Order API Endpoint]
+        InvAPI[Inventory API Endpoint]
     end
 
-    subgraph Usecase [Usecase Layer]
-        UC[CreateOrder Usecase]
+    subgraph UsecaseLayer [Usecase]
+        OrderUC[CreateOrder UC]
+        InvUC[Check/Update UC]
     end
 
-    subgraph Domain [Domain Layer]
-        Entity[Order Entity]
-        RepoInt[Repository Interface]
-        DS[Domain Service]
+    subgraph DomainLayer [Domain]
+        Entities[Order/Inventory Entities]
+        RepoInt[Repository Interfaces]
+        OrderDS[Order Domain Svc]
+        InvDS[Inventory Domain Svc]
     end
 
-    User -->|requests| WebHandler
-    WebHandler -->|calls| UC
-    PostgresRepo -->|implements| RepoInt
-    UC -->|uses| RepoInt
-    UC -->|uses| Entity
-    UC -->|uses| DS
-    DS -->|uses| RepoInt
-    RepoInt -->|uses| Entity
+    subgraph InfraLayer [Infra / Adapters]
+        OrderRepoImpl[Order Repository Impl]
+        InvRepoImpl[Inventory Repository Impl]
+        InvClientImpl[Inventory REST Client]
+        OrderDB[(Order DB)]
+        InvDB[(Inventory DB)]
+    end
 
-    style Domain fill:#f9f,stroke:#333,stroke-width:2px
-    style Usecase fill:#bbf,stroke:#333,stroke-width:2px
-    style Infrastructure fill:#bfb,stroke:#333,stroke-width:2px
+    %% 外部からのアクセス
+    Customer --> OrderAPI
+    Admin --> InvAPI
+    
+    %% APIからユースケースへ
+    OrderAPI --> OrderUC
+    InvAPI --> InvUC
+
+    %% ユースケースからドメインへの依存
+    OrderUC --> OrderDS
+    OrderUC --> RepoInt
+    InvUC --> InvDS
+    InvUC --> RepoInt
+
+    %% ドメインサービスからインターフェースへの依存
+    OrderDS --> RepoInt
+    InvDS --> RepoInt
+
+    %% 依存性逆転 (DIP)
+    OrderRepoImpl -- "implements" --> RepoInt
+    InvRepoImpl -- "implements" --> RepoInt
+    InvClientImpl -- "implements" --> RepoInt
+
+    %% 実装から外部リソースへのアクセス
+    OrderRepoImpl --> OrderDB
+    InvRepoImpl --> InvDB
+
+    %% サービス間連携とAdminフローの統一
+    %% OrderサービスもAdminも同じInventory APIを利用する
+    InvClientImpl --> InvAPI
+    InvAPI --> InvUC
+
+    style DomainLayer fill:#f9f,stroke:#333,stroke-width:2px
+    style UsecaseLayer fill:#bbf,stroke:#333,stroke-width:2px
+    style InfraLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style Gateway fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 
+> **注記: 外部インターフェースの集約**
+> `Customer`（注文者）と `Admin`（在庫管理者）は、それぞれ `Gateway` レイヤーの適切な API エンドポイントを叩きます。また、`Order Service` 内の `Inventory REST Client` も、`Admin` と同じ `Inventory API` を利用することで、在庫操作のロジックを一箇所（Inventory UseCase）に集中させています。
 
 ---
 
@@ -74,9 +112,9 @@ graph TD
 
 ドメイン層はアプリケーションの**心臓部**であり、以下の3つの要素で構成されます。これらは外部（DBやWeb）の都合に一切依存しません。
 
-1.  **Entity**: ビジネスデータとルール（例: `Order`, `Inventory`）。
-2.  **Interface**: データの永続化や外部連携のための契約（例: `OrderRepository`, `InventoryClient`）。
-3.  **Domain Service**: 複数のエンティティにまたがるロジック（例: `OrderDomainService`）。
+1. **Entity**: ビジネスデータとルール（例: `Order`, `Inventory`）。
+2. **Interface**: データの永続化や外部連携のための契約（例: `OrderRepository`, `InventoryClient`）。
+3. **Domain Service**: 複数のエンティティにまたがるロジック（例: `OrderDomainService`）。
 
 まずはビジネスのコアとなる「注文 (Order)」と、外界と対話するための契約「インターフェース」を定義します。
 
@@ -137,9 +175,9 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 
 ここで初めて「PostgreSQL」や「REST API」といった具体的な技術が登場します。**Step 1で定義したドメイン層のインターフェースを実装**します。
 
-*   `PostgresOrderRepository` は `domain.OrderRepository` を実装。
-*   `RestInventoryClient` は `domain.InventoryClient` を実装。
-*   `RabbitMQPaymentPublisher` は `domain.PaymentPublisher` を実装。
+* `PostgresOrderRepository` は `domain.OrderRepository` を実装。
+* `RestInventoryClient` は `domain.InventoryClient` を実装。
+* `RabbitMQPaymentPublisher` は `domain.PaymentPublisher` を実装。
 
 **リポジトリの実装 (`infra/repository/postgres_order_repository.go`)**
 
@@ -170,20 +208,29 @@ func main() {
 
     // 2. ドメインサービスの生成
     orderDomainSvc := service.NewOrderDomainService(inventoryClient)
+    inventoryRepo := &repository.PostgresInventoryRepository{}
+    inventoryDomainSvc := service.NewInventoryDomainService(inventoryRepo)
 
     // 3. ユースケースへの注入
-    // 必要な依存をすべて渡す（DI）
-    createOrderUsecase := usecase.NewCreateOrderUsecase(
-        orderRepo, 
-        orderDomainSvc, 
-        paymentPub, 
-        idGen,
-    )
+    createOrderUsecase := usecase.NewCreateOrderUsecase(orderRepo, orderDomainSvc, paymentPub, idGen)
+    checkInventoryUsecase := usecase.NewCheckInventoryUsecase(inventoryDomainSvc)
+    updateInventoryUsecase := usecase.NewUpdateInventoryUsecase(inventoryDomainSvc)
 
     // 4. 実行
     createOrderUsecase.Execute(ctx, input)
+    checkInventoryUsecase.Execute(ctx, checkInput)
 }
 ```
+
+---
+
+## 設計分析と品質 (Clean Architecture 分析)
+
+本プロジェクトは以下の観点で高品質な設計が維持されています。
+
+1. **疎結合な設計**: 注文 (Order) と 在庫 (Inventory) がドメインレベルで分離されており、将来的なマイクロサービス化が容易です。
+2. **ビジネスロジックの純粋性**: `domain` パッケージには外部ライブラリへの依存が一切なく、ビジネスルールのみが記述されています。
+3. **拡張性**: 新しい通知手段（メール、Slack等）を追加する場合も、`domain/repository` にインターフェースを追加し、`infra` で実装するだけで対応可能です。
 
 ---
 

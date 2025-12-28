@@ -1,4 +1,4 @@
-# Clean Architecture Go Workshop
+# Clean Architecture Workshop): advent-calm-2025
 
 In this workshop, you will learn how to build a robust and testable application using **Go** based on **Clean Architecture**.
 
@@ -28,40 +28,79 @@ This workshop adopts a simple and practical **3-layer structure**.
 ### The Dependency Rule
 
 **"Dependencies always point inwards (towards the Domain)."**
-Source code dependencies must always point from lower-level details to higher-level abstractions. The Infrastructure layer knows about the Usecase layer, but the Usecase layer knows nothing about the Infrastructure layer.
+Source code dependencies must always point from lower-level details to higher-level abstractions.
 
 ```mermaid
 graph TD
-    User[User/Client]
-
-    subgraph Infrastructure [Infra Layer]
-        WebHandler[Web Handler]
-        PostgresRepo[Postgres Repository]
+    %% External / Frameworks & Drivers
+    Customer[Customer]
+    Admin[Admin]
+    
+    subgraph Gateway [Web / API / Gateway]
+        OrderAPI[Order API Endpoint]
+        InvAPI[Inventory API Endpoint]
     end
 
-    subgraph Usecase [Usecase Layer]
-        UC[CreateOrder Usecase]
+    subgraph UsecaseLayer [Usecase]
+        OrderUC[CreateOrder UC]
+        InvUC[Check/Update UC]
     end
 
-    subgraph Domain [Domain Layer]
-        Entity[Order Entity]
-        RepoInt[Repository Interface]
-        DS[Domain Service]
+    subgraph DomainLayer [Domain]
+        Entities[Order/Inventory Entities]
+        RepoInt[Repository Interfaces]
+        OrderDS[Order Domain Svc]
+        InvDS[Inventory Domain Svc]
     end
 
-    User -->|requests| WebHandler
-    WebHandler -->|calls| UC
-    PostgresRepo -->|implements| RepoInt
-    UC -->|uses| RepoInt
-    UC -->|uses| Entity
-    UC -->|uses| DS
-    DS -->|uses| RepoInt
-    RepoInt -->|uses| Entity
+    subgraph InfraLayer [Infra / Adapters]
+        OrderRepoImpl[Order Repository Impl]
+        InvRepoImpl[Inventory Repository Impl]
+        InvClientImpl[Inventory REST Client]
+        OrderDB[(Order DB)]
+        InvDB[(Inventory DB)]
+    end
 
-    style Domain fill:#f9f,stroke:#333,stroke-width:2px
-    style Usecase fill:#bbf,stroke:#333,stroke-width:2px
-    style Infrastructure fill:#bfb,stroke:#333,stroke-width:2px
+    %% External Access
+    Customer --> OrderAPI
+    Admin --> InvAPI
+    
+    %% API to Usecase
+    OrderAPI --> OrderUC
+    InvAPI --> InvUC
+
+    %% Usecase to Domain Dependency
+    OrderUC --> OrderDS
+    OrderUC --> RepoInt
+    InvUC --> InvDS
+    InvUC --> RepoInt
+
+    %% Domain Service to Interface Dependency
+    OrderDS --> RepoInt
+    InvDS --> RepoInt
+
+    %% Dependency Inversion (DIP)
+    OrderRepoImpl -- "implements" --> RepoInt
+    InvRepoImpl -- "implements" --> RepoInt
+    InvClientImpl -- "implements" --> RepoInt
+
+    %% Implementation to External Resources
+    OrderRepoImpl --> OrderDB
+    InvRepoImpl --> InvDB
+
+    %% Service Integration & Admin Flow Unification
+    %% Both Order Service and Admin use the same Inventory API.
+    InvClientImpl --> InvAPI
+    InvAPI --> InvUC
+
+    style DomainLayer fill:#f9f,stroke:#333,stroke-width:2px
+    style UsecaseLayer fill:#bbf,stroke:#333,stroke-width:2px
+    style InfraLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style Gateway fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
+
+> **Note: Unifying External Interfaces**
+> Both the `Customer` and `Admin` interact with the system via the appropriate API endpoints in the `Gateway` layer. By having the `Inventory REST Client` (within the Order Service) use the same `Inventory API` as the `Admin`, we centralize all inventory-related logic within the `Inventory UseCase`.
 
 ---
 
@@ -73,9 +112,9 @@ We will implement a fictional "Order Creation System," starting from the inside 
 
 The Domain Layer is the **heart** of the application and consists of the following three elements. These do not depend on any external (DB or Web) concerns.
 
-1.  **Entity**: Business data and rules (e.g., `Order`, `Inventory`).
-2.  **Interface**: Contracts for data persistence or external integration (e.g., `OrderRepository`, `InventoryClient`).
-3.  **Domain Service**: Logic that spans multiple entities (e.g., `OrderDomainService`).
+1. **Entity**: Business data and rules (e.g., `Order`, `Inventory`).
+2. **Interface**: Contracts for data persistence or external integration (e.g., `OrderRepository`, `InventoryClient`).
+3. **Domain Service**: Logic that spans multiple entities (e.g., `OrderDomainService`).
 
 First, we define the core business object, the "Order," and the "Interfaces" used to interact with the outside world.
 
@@ -136,9 +175,9 @@ The key point here is that `CreateOrderUsecase` does not know about the concrete
 
 This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We implement the Domain Layer interfaces defined in Step 1**.
 
-*   `PostgresOrderRepository` implements `domain.OrderRepository`.
-*   `RestInventoryClient` implements `domain.InventoryClient`.
-*   `RabbitMQPaymentPublisher` implements `domain.PaymentPublisher`.
+* `PostgresOrderRepository` implements `domain.OrderRepository`.
+* `RestInventoryClient` implements `domain.InventoryClient`.
+* `RabbitMQPaymentPublisher` implements `domain.PaymentPublisher`.
 
 **Repository Implementation (`infra/repository/postgres_order_repository.go`)**
 
@@ -169,20 +208,29 @@ func main() {
 
     // 2. Create Domain Service
     orderDomainSvc := service.NewOrderDomainService(inventoryClient)
+    inventoryRepo := &repository.PostgresInventoryRepository{}
+    inventoryDomainSvc := service.NewInventoryDomainService(inventoryRepo)
 
     // 3. Inject into Usecase
-    // Pass all necessary dependencies (DI)
-    createOrderUsecase := usecase.NewCreateOrderUsecase(
-        orderRepo, 
-        orderDomainSvc, 
-        paymentPub, 
-        idGen,
-    )
+    createOrderUsecase := usecase.NewCreateOrderUsecase(orderRepo, orderDomainSvc, paymentPub, idGen)
+    checkInventoryUsecase := usecase.NewCheckInventoryUsecase(inventoryDomainSvc)
+    updateInventoryUsecase := usecase.NewUpdateInventoryUsecase(inventoryDomainSvc)
 
     // 4. Run
     createOrderUsecase.Execute(ctx, input)
+    checkInventoryUsecase.Execute(ctx, checkInput)
 }
 ```
+
+---
+
+## Design Analysis & Quality (Clean Architecture Analysis)
+
+This project maintains high design quality based on the following principles:
+
+1. **Loose Coupling**: Order and Inventory concerns are separated at the domain level, making it easy to split into microservices in the future.
+2. **Pure Business Logic**: The `domain` package has zero dependencies on external libraries, containing only business rules.
+3. **Extensibility**: Adding new notification methods (Email, Slack, etc.) only requires adding an interface to `domain/repository` and implementing it in `infra`.
 
 ---
 
