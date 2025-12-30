@@ -69,6 +69,7 @@ openssl x509 -req -in server.csr -CA rootCA.crt -CAkey rootCA.key -CAcreateseria
 ## 5. Step 3: 証明書の内容確認と検証
 
 ### 3.1 証明書の詳細を確認する
+
 発行された証明書の中身をテキスト形式で表示し、設定した項目が正しく反映されているか確認します。
 
 ```bash
@@ -76,6 +77,7 @@ openssl x509 -noout -text -in server.crt
 ```
 
 #### 出力サンプルの読み方
+
 以下のような情報が表示されます。
 
 ```text
@@ -106,10 +108,11 @@ Certificate:
 - **Issuer (発行者)**: この証明書に署名した CA。
 - **Validity (有効期間)**: `Not Before` (開始) から `Not After` (終了) まで。
 - **Subject (所有者)**: この証明書の持ち主の情報。
-    - **CN (Common Name)**: かつては識別に使用されていましたが、現在は SAN が優先されます。
+  - **CN (Common Name)**: かつては識別に使用されていましたが、現在は SAN が優先されます。
 - **X509v3 Subject Alternative Name (SAN)**: **現代の HTTPS において最も重要な項目**です。証明書が有効なドメイン名や IP アドレスのリストです。
 
 ### 3.2 証明書の検証
+
 発行された証明書が、正しく CA によって署名されているか確認します。
 
 ```bash
@@ -126,6 +129,7 @@ openssl verify -CAfile rootCA.crt server.crt
     - **CNAME との関係**: CNAME は DNS レベルの別名です。証明書の検証においては、最終的にアクセスしているドメイン名が SAN に含まれている必要があります。
 
 ### SSL Pass-through と SAN
+
 Load Balancer (LB) で SSL 終端を行わず、バックエンドの Web サーバーまで暗号化されたまま転送する **SSL Pass-through** 構成では、Web サーバー自身が証明書を持ちます。
 
 この場合、LB の手前（クライアントがアクセスするドメイン名）と、Web サーバーの証明書の SAN が一致している必要があります。一致していない場合、クライアントは「セキュリティ警告」を表示します。

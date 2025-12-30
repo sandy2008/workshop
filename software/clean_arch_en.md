@@ -1,13 +1,24 @@
-# Clean Architecture (3-Layer Structure)
+# Clean Architecture (4-Layer Structure)
 
 A proposal for building loosely coupled software centered on business logic, independent of external details such as databases or communication protocols.
 
 ## Layer Structure and Dependencies
 
-Dependencies always point **inwards (towards the Domain)**. External inputs like Web call the UseCase, and Infra depends on the Domain through interfaces.
+Dependencies always point **inwards (towards the Domain)**. External inputs like Web call the UseCase, and Interface Adapters depend on the Domain through interfaces.
 
 ```mermaid
 graph TD
+    subgraph FrameworkLayer [Frameworks / Drivers]
+        Web[Web / UI / External]
+        DB[(Database)]
+    end
+
+    subgraph AdapterLayer [Interface Adapters]
+        Controller[Controller / Handler]
+        Presenter[Presenter]
+        RI_Impl[Repository Impl]
+    end
+
     subgraph UseCaseLayer [UseCase]
         UC[UseCase]
     end
@@ -18,19 +29,13 @@ graph TD
         RI[Repository Interface]
     end
 
-    subgraph InfraLayer [Infra / Adapters]
-        RI_Impl[Repository Impl]
-        DB[(Database)]
-    end
-
-    %% External Elements
-    Web[Web / UI / External]
-
     %% Dependencies
-    Web --> UC
+    Web --> Controller
+    Controller --> UC
     UC --> DomainLayer
     RI_Impl -- "implements" --> RI
     RI_Impl --> DB
+    UC --> Presenter
 ```
 
 ---
@@ -50,12 +55,19 @@ Describes the steps to realize specific "features" of the application.
 * **Role:** Manipulates objects from the Domain layer and defines the flow of processing (orchestration).
 * **Dependencies:** Depends only on the Domain layer. It is unaware of what the external database actually is.
 
-## 3. Infra / Adapters Layer
+## 3. Interface Adapters Layer
 
-Responsible for bridging with external systems (Adapters) and specific technical implementations.
+Responsible for translating I/O and bridging external systems to internal models.
 
-* **Repository Impl (Adapter):** Specifically implements the interface defined in the Domain layer. This is where SQL queries and other concrete operations occur.
-* **External Resources:** Concrete entities such as databases, external APIs, and file systems.
+* **Controller / Presenter:** Converts external requests to UseCase inputs and outputs back to external formats.
+* **Repository Impl (Adapter):** Specifically implements the interface defined in the Domain layer. Mapping and query construction live here.
+
+## 4. Frameworks / Drivers Layer
+
+The concrete technologies and I/O implementations.
+
+* **External Resources:** Databases, external APIs, file systems, web frameworks.
+* **Responsibility:** Provide low-level I/O; they do not hold business rules.
 
 ---
 
@@ -70,11 +82,12 @@ Defines business rules (interfaces).
 ```go
 // domain/membership.go
 package domain
+
 import "context"
 
-// MembershipRepository defines abstract queries against a data source
+// MembershipRepository defines abstract queries against a data source.
 type MembershipRepository interface {
- IsMember(ctx context.Context, userID, groupID string) (bool, error)
+	IsMember(ctx context.Context, userID, groupID string) (bool, error)
 }
 ```
 
@@ -87,54 +100,55 @@ Defines business "procedures". Uses Domain interfaces.
 package usecase
 
 import (
- "context"
- "your-project/domain"
+	"context"
+
+	"your-project/domain"
 )
 
-// MembershipUseCase is the concrete executor of the use case
+// MembershipUseCase is the concrete executor of the use case.
 type MembershipUseCase struct {
- repo domain.MembershipRepository
+	repo domain.MembershipRepository
 }
 
 func NewMembershipUseCase(r domain.MembershipRepository) *MembershipUseCase {
- return &MembershipUseCase{repo: r}
+	return &MembershipUseCase{repo: r}
 }
 
-// Execute performs the "membership check" use case
-func (u *MembershipUseCase) Execute(ctx context.Context, userID, groupID string) (bool, error) {
- // Domain-specific validation can be performed here if necessary
- return u.repo.IsMember(ctx, userID, groupID)
+// Execute performs the "membership check" use case.
+func (uc *MembershipUseCase) Execute(ctx context.Context, userID, groupID string) (bool, error) {
+	// Domain-specific validation can be performed here if necessary.
+	return uc.repo.IsMember(ctx, userID, groupID)
 }
 ```
 
-### 3. Infra Layer
+### 3. Interface Adapters Layer
 
-Specifically implements the interface.
+Specifically implements the interface. DB driver details stay outside this layer.
 
 ```go
 // infra/membership_repository.go
 package infra
 
 import (
- "context"
- "database/sql"
+	"context"
+	"database/sql"
 )
 
-// SqlMembershipRepository is a repository implementation using a SQL database
-type SqlMembershipRepository struct {
- db *sql.DB
+// SQLMembershipRepository is a repository implementation using a SQL database.
+type SQLMembershipRepository struct {
+	db *sql.DB
 }
 
-func NewSqlMembershipRepository(db *sql.DB) *SqlMembershipRepository {
- return &SqlMembershipRepository{db: db}
+func NewSQLMembershipRepository(db *sql.DB) *SQLMembershipRepository {
+	return &SQLMembershipRepository{db: db}
 }
 
-// IsMember issues actual SQL against the database
-func (r *SqlMembershipRepository) IsMember(ctx context.Context, userID, groupID string) (bool, error) {
- var exists bool
- query := "SELECT EXISTS(SELECT 1 FROM memberships WHERE user_id = ? AND group_id = ?)"
- err := r.db.QueryRowContext(ctx, query, userID, groupID).Scan(&exists)
- return exists, err
+// IsMember issues actual SQL against the database.
+func (r *SQLMembershipRepository) IsMember(ctx context.Context, userID, groupID string) (bool, error) {
+	var exists bool
+	query := "SELECT EXISTS(SELECT 1 FROM memberships WHERE user_id = ? AND group_id = ?)"
+	err := r.db.QueryRowContext(ctx, query, userID, groupID).Scan(&exists)
+	return exists, err
 }
 ```
 
@@ -142,22 +156,34 @@ func (r *SqlMembershipRepository) IsMember(ctx context.Context, userID, groupID 
 
 ## Calling from External (REST / gRPC)
 
-Web frameworks or gRPC servers reside at the outermost edge and are only responsible for calling the `UseCase`.
+Web frameworks or gRPC servers reside at the outermost edge and are only responsible for calling the `UseCase`. Handlers depend on **UseCase interfaces (input ports)** to keep implementations swappable.
+
+```go
+// usecase/membership_port.go
+package usecase
+
+import "context"
+
+// MembershipChecker is the input port (public UseCase API).
+type MembershipChecker interface {
+	Execute(ctx context.Context, userID, groupID string) (bool, error)
+}
+```
 
 ```go
 // Example usage in a Web handler
 func HandleCheckMembership(w http.ResponseWriter, r *http.Request) {
-    // 1. Create real DB instance (usually done at startup)
-    dbRepo := infra.NewSqlMembershipRepository(sqlDB)
+	// 1. Create real DB instance (usually done at startup)
+	dbRepo := infra.NewSQLMembershipRepository(sqlDB)
 
-    // 2. Inject repository into the UseCase (Dependency Injection)
-    useCase := usecase.NewMembershipUseCase(dbRepo)
+	// 2. Inject repository into the UseCase (Dependency Injection)
+	useCase := usecase.NewMembershipUseCase(dbRepo)
 
-    // 3. Execute the UseCase
-    isMember, err := useCase.Execute(r.Context(), "user123", "groupA")
+	// 3. Execute the UseCase
+	isMember, err := useCase.Execute(r.Context(), "user123", "groupA")
 
-    // 4. Return result as response
-    json.NewEncoder(w).Encode(map[string]bool{"is_member": isMember})
+	// 4. Return result as response
+	json.NewEncoder(w).Encode(map[string]bool{"is_member": isMember})
 }
 ```
 
@@ -176,3 +202,15 @@ In the Go implementation example, `ctx context.Context` is passed through each l
 * **Use Arguments for:** **Essential business data** such as `userID` or `groupID`. Passing these explicitly as arguments ensures type safety and makes the function's dependencies clear.
 
 * **Use ctx for:** **Cross-cutting (supplementary) information** such as `Request ID` or `Auth Tokens`. These are not core to the business logic but are necessary for logging, authorization at the infra layer, or distributed tracing.
+
+## Ports and Repository Boundary
+
+* **Input Port:** The UseCase interface called by external adapters (Web/CLI/Batch). Controllers depend on this port.
+* **Output Port:** Contracts the Domain/UseCase require from the outside (e.g., repositories). Interfaces live inside, implementations live in adapters.
+* **Repository Boundary:** Repositories define persistence contracts. Transactions and retries sit in UseCase; mapping and query construction belong in adapters.
+
+### Go Implementation Notes
+
+* **SQL placeholders:** Drivers differ (`?`, `$1`, etc.). Choose what matches your driver.
+* **Initialisms:** In Go, initialisms like `SQL` are typically all-caps.
+* **Context values:** Use typed keys and avoid storing business data in `context`.

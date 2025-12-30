@@ -7,9 +7,9 @@ The complete project files are in the [advent-of-calm-2025](./advent-of-calm-202
 
 Clean Architecture is a design philosophy that separates concerns, keeping business logic independent of frameworks, databases, and external tools.
 
-### The 3 Layers
+### The 4 Layers
 
-This workshop adopts a simple and practical **3-layer structure**.
+This workshop adopts a simple and practical **4-layer structure**.
 
 1. **Domain Layer** - `domain/`
     * **Role**: Core business rules and data structures.
@@ -21,10 +21,14 @@ This workshop adopts a simple and practical **3-layer structure**.
     * **Characteristics**: Depends only on the Domain Layer. Knows nothing about the DB or HTTP details.
     * **Components**: Interactors (Usecases), Input/Output Data Structures (DTOs).
 
-3. **Infrastructure Layer** - `infra/`
-    * **Role**: Detailed technical implementations (DB connections, external API calls, web frameworks).
+3. **Interface Adapters Layer** - `infra/`
+    * **Role**: Translate external I/O to UseCase inputs and implement domain contracts.
     * **Characteristics**: **Implements the interfaces defined in the Domain Layer** (dependencies point inward).
     * **Components**: Repository implementations, Web handlers, External clients.
+
+4. **Frameworks / Drivers Layer**
+    * **Role**: Concrete technologies like DB drivers, external SDKs, web frameworks.
+    * **Characteristics**: Provide low-level I/O only; no business rules.
 
 ### The Dependency Rule
 
@@ -54,10 +58,13 @@ graph TD
         InvDS[Inventory Domain Svc]
     end
 
-    subgraph InfraLayer [Infra / Adapters]
+    subgraph AdapterLayer [Interface Adapters]
         OrderRepoImpl[Order Repository Impl]
         InvRepoImpl[Inventory Repository Impl]
         InvClientImpl[Inventory REST Client]
+    end
+
+    subgraph FrameworkLayer [Frameworks / Drivers]
         OrderDB[(Order DB)]
         InvDB[(Inventory DB)]
     end
@@ -96,7 +103,8 @@ graph TD
 
     style DomainLayer fill:#f9f,stroke:#333,stroke-width:2px
     style UsecaseLayer fill:#bbf,stroke:#333,stroke-width:2px
-    style InfraLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style AdapterLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style FrameworkLayer fill:#ffd,stroke:#333,stroke-width:2px
     style Gateway fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 
@@ -104,7 +112,13 @@ graph TD
 > `Customer` (the person ordering) and `Admin` (inventory manager) interact with the system via the appropriate API endpoints in the `Gateway` layer. Furthermore, the `Inventory REST Client` within the `Order Service` uses the same `Inventory API` as the `Admin`, centralizing all inventory-related logic within the `Inventory Usecase`.
 
 > **What are "Ports"?**
-> Ports are the "contracts (interfaces) that the inner rules demand from the outside." Details about the DB or external APIs are hidden behind Ports. Usecases and Domain Services depend on Ports to define behavior only. The outside layer (Infra) implements these Ports, keeping the dependency direction pointing inward.
+> Ports are the "contracts (interfaces) that the inner rules demand from the outside." Details about the DB or external APIs are hidden behind Ports. Usecases and Domain Services depend on Ports to define behavior only. The outside layer (Interface Adapters) implements these Ports, keeping the dependency direction pointing inward.
+
+### Ports and Repository Boundary
+
+* **Input Port:** The UseCase interface exposed to external adapters. Controllers depend on this port.
+* **Output Port:** Contracts required by Domain/UseCase (e.g., repositories, clients). Interfaces live inside, implementations live in adapters.
+* **Repository Boundary:** Persistence contracts. Transactions/retries belong in UseCase; mapping and query construction belong in adapters.
 
 ---
 
@@ -132,11 +146,11 @@ Define the state and structure of an Order.
 
 ```go
 type Order struct {
-    ID         string
-    CustomerID string
-    Amount     float64
-    Status     OrderStatus
-    CreatedAt  time.Time
+	ID         string
+	CustomerID string
+	Amount     float64
+	Status     OrderStatus
+	CreatedAt  time.Time
 }
 ```
 
@@ -146,16 +160,16 @@ type Order struct {
 ```go
 // Dependency Inversion Principle (DIP): High-level modules own the abstractions.
 type OrderRepository interface {
-    Save(ctx context.Context, order *entity.Order) error
-    FindByID(ctx context.Context, id string) (*entity.Order, error)
+	Save(ctx context.Context, order *entity.Order) error
+	FindByID(ctx context.Context, id string) (*entity.Order, error)
 }
 
 type InventoryClient interface {
-    CheckAndReserve(ctx context.Context, productID string, quantity int) (bool, error)
+	CheckAndReserve(ctx context.Context, productID string, quantity int) (bool, error)
 }
 
 type PaymentPublisher interface {
-    PublishPaymentTask(ctx context.Context, order *entity.Order) error
+	PublishPaymentTask(ctx context.Context, order *entity.Order) error
 }
 ```
 
@@ -170,15 +184,15 @@ Combine the Domain Layer components to implement the application feature: "Creat
 
 ```go
 type CreateOrderUsecase struct {
-    orderRepo repository.OrderRepository // Depends on abstraction
-    // ...
+	orderRepo repository.OrderRepository // Depends on abstraction
+	// ...
 }
 
 func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput) error {
-    // 1. Check stock (using Domain Service)
-    // 2. Create Order entity
-    // 3. Save to database (using Repository)
-    // 4. Publish event
+	// 1. Check stock (using Domain Service)
+	// 2. Create Order entity
+	// 3. Save to database (using Repository)
+	// 4. Publish event
 }
 ```
 
@@ -187,9 +201,9 @@ The key point here is that `CreateOrderUsecase` does not know about the concrete
 > **Note: Transactional Consistency (DB Save vs. MQ Publish)**
 > In this example, "DB Save -> MQ Publish" are executed sequentially. In real-world systems, you should consider transaction boundaries and compensation (e.g., the Outbox pattern) to prevent double-sends or missing messages.
 
-### Step 3: Implementing the Infrastructure Layer (`infra/`)
+### Step 3: Implementing the Interface Adapters Layer (`infra/`)
 
-This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We implement the Domain Layer interfaces defined in Step 1**.
+This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We implement the Domain Layer interfaces defined in Step 1**. DB drivers and SDKs are pushed out to Frameworks/Drivers.
 
 * `PostgresOrderRepository` implements `domain.OrderRepository`.
 * `RestInventoryClient` implements `domain.InventoryClient`.
@@ -199,14 +213,14 @@ This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We
 
 ```go
 type PostgresOrderRepository struct {
-    // DB connection instance, etc.
+	// DB connection instance, etc.
 }
 
 // Satisfies the domain/repository.OrderRepository interface
 func (r *PostgresOrderRepository) Save(ctx context.Context, order *entity.Order) error {
-    fmt.Printf("Saving order %s to Postgres\n", order.ID)
-    // Actual SQL execution logic...
-    return nil
+	fmt.Printf("Saving order %s to Postgres\n", order.ID)
+	// Actual SQL execution logic...
+	return nil
 }
 ```
 
@@ -216,25 +230,25 @@ Finally, we wire up all the parts in `main.go` using **Dependency Injection**.
 
 ```go
 func main() {
-    // 1. Create Infrastructure objects
-    orderRepo := &repository.PostgresOrderRepository{}
-    inventoryClient := &client.RestInventoryClient{}
-    paymentPub := &messaging.RabbitMQPaymentPublisher{}
-    idGen := &util.UUIDGenerator{} // ID Generator implementation
+	// 1. Create Interface Adapters objects
+	orderRepo := &repository.PostgresOrderRepository{}
+	inventoryClient := &client.RestInventoryClient{}
+	paymentPub := &messaging.RabbitMQPaymentPublisher{}
+	idGen := &util.UUIDGenerator{} // ID Generator implementation
 
-    // 2. Create Domain Service
-    orderDomainSvc := service.NewOrderDomainService(inventoryClient)
-    inventoryRepo := &repository.PostgresInventoryRepository{}
-    inventoryDomainSvc := service.NewInventoryDomainService(inventoryRepo)
+	// 2. Create Domain Service
+	orderDomainSvc := service.NewOrderDomainService(inventoryClient)
+	inventoryRepo := &repository.PostgresInventoryRepository{}
+	inventoryDomainSvc := service.NewInventoryDomainService(inventoryRepo)
 
-    // 3. Inject into Usecase
-    createOrderUsecase := usecase.NewCreateOrderUsecase(orderRepo, orderDomainSvc, paymentPub, idGen)
-    checkInventoryUsecase := usecase.NewCheckInventoryUsecase(inventoryDomainSvc)
-    updateInventoryUsecase := usecase.NewUpdateInventoryUsecase(inventoryDomainSvc)
+	// 3. Inject into Usecase
+	createOrderUsecase := usecase.NewCreateOrderUsecase(orderRepo, orderDomainSvc, paymentPub, idGen)
+	checkInventoryUsecase := usecase.NewCheckInventoryUsecase(inventoryDomainSvc)
+	updateInventoryUsecase := usecase.NewUpdateInventoryUsecase(inventoryDomainSvc)
 
-    // 4. Run
-    createOrderUsecase.Execute(ctx, input)
-    checkInventoryUsecase.Execute(ctx, checkInput)
+	// 4. Run
+	createOrderUsecase.Execute(ctx, input)
+	checkInventoryUsecase.Execute(ctx, checkInput)
 }
 ```
 

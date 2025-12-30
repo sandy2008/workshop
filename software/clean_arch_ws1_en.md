@@ -24,19 +24,19 @@ package domain
 import "time"
 
 type User struct {
- ID       string
- Name     string
- JoinedAt time.Time // Joining date
+	ID       string
+	Name     string
+	JoinedAt time.Time // Joining date
 }
 
-// GetTenureYears returns the number of years of service
+// GetTenureYears returns the number of years of service.
 func (u *User) GetTenureYears() int {
- now := time.Now()
- years := now.Year() - u.JoinedAt.Year()
- if now.YearDay() < u.JoinedAt.YearDay() {
-  years--
- }
- return years
+	now := time.Now()
+	years := now.Year() - u.JoinedAt.Year()
+	if now.YearDay() < u.JoinedAt.YearDay() {
+		years--
+	}
+	return years
 }
 ```
 
@@ -50,9 +50,9 @@ package domain
 
 type VeteranService struct{}
 
-// IsVeteran determines if a user is a veteran (5 or more years of service)
-func (s *VeteranService) IsVeteran(user *User) bool {
- return user.GetTenureYears() >= 5
+// IsVeteran determines if a user is a veteran (5 or more years of service).
+func (s VeteranService) IsVeteran(user *User) bool {
+	return user.GetTenureYears() >= 5
 }
 ```
 
@@ -65,21 +65,26 @@ Combine Domain objects to realize the use case.
 package usecase
 
 import (
- "context"
- "your-project/domain"
+	"context"
+
+	"your-project/domain"
 )
 
 type CheckVeteranUseCase struct {
- repo       domain.UserRepository
- veteranSvc domain.VeteranService
+	repo       domain.UserRepository
+	veteranSvc domain.VeteranService
+}
+
+func NewCheckVeteranUseCase(repo domain.UserRepository, veteranSvc domain.VeteranService) *CheckVeteranUseCase {
+	return &CheckVeteranUseCase{repo: repo, veteranSvc: veteranSvc}
 }
 
 func (uc *CheckVeteranUseCase) Execute(ctx context.Context, id string) (bool, error) {
- user, err := uc.repo.FindByID(ctx, id) // Retrieved via repository
- if err != nil {
-  return false, err
- }
- return uc.veteranSvc.IsVeteran(user), nil
+	user, err := uc.repo.FindByID(ctx, id) // Retrieved via repository
+	if err != nil {
+		return false, err
+	}
+	return uc.veteranSvc.IsVeteran(user), nil
 }
 ```
 
@@ -97,18 +102,27 @@ Create an AD repository that satisfies the `domain.UserRepository` interface.
 // infra/ad_user_repository.go
 package infra
 
-type AdUserRepository struct {
- ldapClient *LdapClient // Pseudo library
+import (
+	"context"
+
+	"your-project/domain"
+)
+
+type ADUserRepository struct {
+	ldapClient *LDAPClient // Pseudo library
 }
 
-func (r *AdUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
- // Issue LDAP query to retrieve info
- entry, _ := r.ldapClient.Search(id)
- return &domain.User{
-  ID:       entry.UID,
-  Name:     entry.DisplayName,
-  JoinedAt: entry.CreationDate,
- }, nil
+func (r *ADUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
+	// Issue LDAP query to retrieve info
+	entry, err := r.ldapClient.Search(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.User{
+		ID:       entry.UID,
+		Name:     entry.DisplayName,
+		JoinedAt: entry.CreationDate,
+	}, nil
 }
 ```
 
@@ -118,14 +132,14 @@ Simply swap the concrete class being injected in the main process (entry point).
 
 ```go
 func main() {
- // Old: sqlRepo := infra.NewSqlUserRepository(db)
- // New:
- adRepo := infra.NewAdUserRepository(ldapClient)
+	// Old: sqlRepo := infra.NewSQLUserRepository(db)
+	// New:
+	adRepo := infra.NewADUserRepository(ldapClient)
 
- // Since UseCase takes an interface as an argument, it can accept adRepo as-is
- useCase := usecase.NewCheckVeteranUseCase(adRepo)
+	// Since UseCase takes an interface as an argument, it can accept adRepo as-is
+	useCase := usecase.NewCheckVeteranUseCase(adRepo, domain.VeteranService{})
 
- // After this, the code calling useCase.Execute() requires ZERO changes!
+	// After this, the code calling useCase.Execute() requires ZERO changes!
 }
 ```
 
@@ -140,3 +154,6 @@ func main() {
 2. **Localization of Change:**
     - Even when the data source changed from DB to AD, we only had to add new code to the `infra` layer and change the injection target in `main`.
     - **The core business logic (Domain/UseCase) remains untouched with zero lines of modification.** This is the true value of Clean Architecture.
+3. **Ports and Boundaries:**
+    - `domain.UserRepository` is an **output port**; implementations live in Interface Adapters.
+    - Details like `LDAPClient` or DB drivers stay in Frameworks/Drivers and never leak into Domain/UseCase.

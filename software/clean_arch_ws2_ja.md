@@ -21,8 +21,10 @@ WS1 に続き、さらに実践的なシナリオを通じて、副作用の制�
 // domain/notification.go
 package domain
 
+import "context"
+
 type NotificationService interface {
- Send(ctx context.Context, message string) error
+	Send(ctx context.Context, message string) error
 }
 ```
 
@@ -37,8 +39,8 @@ package usecase
 import "context"
 
 func (uc *ApproveUseCase) Execute(ctx context.Context, userID string) error {
- // ... 承認ロジック ...
- return uc.notifier.Send(ctx, "メンバーシップが承認されました！")
+	// ... 承認ロジック ...
+	return uc.notifier.Send(ctx, "メンバーシップが承認されました！")
 }
 ```
 
@@ -48,13 +50,17 @@ func (uc *ApproveUseCase) Execute(ctx context.Context, userID string) error {
 
 ```go
 // infra/slack_notifier.go (後から追加)
+package infra
+
+import "context"
+
 type SlackNotifier struct {
- webhookURL string
+	webhookURL string
 }
 
 func (n *SlackNotifier) Send(ctx context.Context, msg string) error {
- // Slack API を叩く実装
- return nil
+	// Slack API を叩く実装
+	return nil
 }
 ```
 
@@ -66,29 +72,36 @@ func (n *SlackNotifier) Send(ctx context.Context, msg string) error {
 
 ### 2-1. キャッシュ用リポジトリの実装
 
-元の `SqlUserRepository` をラップする、新しい Infra 実装を作ります。
+元の `SQLUserRepository` をラップする、新しい Infra 実装を作ります。
 
 ```go
 // infra/cached_user_repository.go
 package infra
 
+import (
+	"context"
+
+	"your-project/domain"
+	"github.com/redis/go-redis/v9"
+)
+
 type CachedUserRepository struct {
- origin domain.UserRepository // 本物のDBリポジトリ
- cache  *redis.Client         // キャッシュDB
+	origin domain.UserRepository // 本物のDBリポジトリ
+	cache  *redis.Client         // キャッシュDB
 }
 
 func (r *CachedUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
- // 1. キャッシュにあればそれを返す
- if user, err := r.getFromCache(id); err == nil {
-  return user, nil
- }
+	// 1. キャッシュにあればそれを返す
+	if user, err := r.getFromCache(id); err == nil {
+		return user, nil
+	}
 
- // 2. なければ本物のDBに聞きに行く
- user, err := r.origin.FindByID(ctx, id)
- if err == nil {
-  r.saveToCache(user) // 次のために保存
- }
- return user, err
+	// 2. なければ本物のDBに聞きに行く
+	user, err := r.origin.FindByID(ctx, id)
+	if err == nil {
+		_ = r.saveToCache(user) // 次のために保存
+	}
+	return user, err
 }
 ```
 
@@ -98,12 +111,12 @@ func (r *CachedUserRepository) FindByID(ctx context.Context, id string) (*domain
 
 ```go
 func main() {
- realRepo := infra.NewSqlUserRepository(db)
- // 本物をキャッシュ機能でラッピングする
- cachedRepo := infra.NewCachedUserRepository(realRepo, redisClient)
+	realRepo := infra.NewSQLUserRepository(db)
+	// 本物をキャッシュ機能でラッピングする
+	cachedRepo := infra.NewCachedUserRepository(realRepo, redisClient)
 
- // UseCase は interface を見ているので、ラップされた cachedRepo もそのまま受け取れる
- useCase := usecase.NewCheckVeteranUseCase(cachedRepo)
+	// UseCase は interface を見ているので、ラップされた cachedRepo もそのまま受け取れる
+	useCase := usecase.NewCheckVeteranUseCase(cachedRepo, domain.VeteranService{})
 }
 ```
 
@@ -117,3 +130,6 @@ func main() {
 2. **透過的な機能追加 (課題 2)**:
     - インターフェースが同じであれば、中身が「DB から取るもの」から「キャッシュ制御付きで取るもの」に変わっても、呼び出し元は一切気づきません。
     - これにより、ビジネスロジックの健全性を保ったまま、インフラ面での改善（パフォーマンス対策、ロギング、リトライ処理の追加など）を自由に行えます。
+3. **ポートと実装の分離**:
+    - 通知インターフェースは出力ポートであり、Slack/Email 実装は Interface Adapters に置きます。
+    - Redis クライアントのような詳細は Frameworks/Drivers に閉じ込めます。

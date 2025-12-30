@@ -7,9 +7,9 @@
 
 Clean Architecture（クリーンアーキテクチャ）は、ソフトウェアの関心事を分離し、ビジネスロジックをフレームワークや外部ツールから独立させるための設計指針です。
 
-### 3層構造（The 3 Layers）
+### 4層構造（The 4 Layers）
 
-本ワークショップでは、シンプルで実用的な **3層構造** を採用します。
+本ワークショップでは、シンプルで実用的な **4層構造** を採用します。
 
 1. **ドメイン層 (Domain Layer)** - `domain/`
     * **役割**: ビジネスの中核となるルールとデータ構造。
@@ -21,10 +21,14 @@ Clean Architecture（クリーンアーキテクチャ）は、ソフトウェ�
     * **特徴**: ドメイン層にのみ依存します。DBやHTTPの詳細を知りません。
     * **構成要素**: ユースケース (Interactor), 入力/出力データ構造 (DTO)。
 
-3. **インフラ層 (Infrastructure Layer)** - `infra/`
-    * **役割**: 詳細な技術的実装（DB接続、外部API通信、Webフレームワーク）。
+3. **インターフェースアダプター層 (Interface Adapters)** - `infra/`
+    * **役割**: 外部I/OをUseCase向けに変換し、ドメインの契約を実装する。
     * **特徴**: **ドメイン層のインターフェースに依存して実装する層**です（依存は内向き）。
     * **構成要素**: リポジトリの実装 (Repository Impl), Webハンドラー, 外部クライアント。
+
+4. **フレームワーク層 (Frameworks / Drivers)**
+    * **役割**: DBドライバ、外部API SDK、Webフレームワークなどの具体技術。
+    * **特徴**: 低レベルI/Oのみを提供し、ビジネスルールは持ちません。
 
 ### 依存性のルール (The Dependency Rule)
 
@@ -54,10 +58,13 @@ graph TD
         InvDS[Inventory Domain Svc]
     end
 
-    subgraph InfraLayer [Infra / Adapters]
+    subgraph AdapterLayer [Interface Adapters]
         OrderRepoImpl[Order Repository Impl]
         InvRepoImpl[Inventory Repository Impl]
         InvClientImpl[Inventory REST Client]
+    end
+
+    subgraph FrameworkLayer [Frameworks / Drivers]
         OrderDB[(Order DB)]
         InvDB[(Inventory DB)]
     end
@@ -96,7 +103,8 @@ graph TD
 
     style DomainLayer fill:#f9f,stroke:#333,stroke-width:2px
     style UsecaseLayer fill:#bbf,stroke:#333,stroke-width:2px
-    style InfraLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style AdapterLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style FrameworkLayer fill:#ffd,stroke:#333,stroke-width:2px
     style Gateway fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 
@@ -104,7 +112,13 @@ graph TD
 > `Customer`（注文者）と `Admin`（在庫管理者）は、それぞれ `Gateway` レイヤーの適切な API エンドポイントを叩きます。また、`Order Service` 内の `Inventory REST Client` も、`Admin` と同じ `Inventory API` を利用することで、在庫操作のロジックを一箇所（Inventory UseCase）に集中させています。
 
 > **Ports とは？**
-> Ports は「内側のルールが外側に求める契約（インターフェース）」です。DBや外部APIの詳細は Ports の背後に隠れ、ユースケースやドメインサービスは Ports に依存して振る舞いだけを定義します。外側（Infra）は Ports を実装することで依存方向を内向きに保ちます。
+> Ports は「内側のルールが外側に求める契約（インターフェース）」です。DBや外部APIの詳細は Ports の背後に隠れ、ユースケースやドメインサービスは Ports に依存して振る舞いだけを定義します。外側（Interface Adapters）は Ports を実装することで依存方向を内向きに保ちます。
+
+### ポート設計とリポジトリ境界
+
+* **入力ポート:** UseCase が公開するインターフェース。Web/CLI などの Controller はこのポートに依存します。
+* **出力ポート:** Domain/UseCase が外側に要求する契約（例: Repository, Client）。インターフェースは内側に置き、実装は Adapter 側に置きます。
+* **リポジトリ境界:** 永続化の契約。トランザクション/リトライなどの制御は UseCase 側、データ変換やクエリ組み立ては Adapter 側の責務です。
 
 ---
 
@@ -132,11 +146,11 @@ graph TD
 
 ```go
 type Order struct {
-    ID         string
-    CustomerID string
-    Amount     float64
-    Status     OrderStatus
-    CreatedAt  time.Time
+	ID         string
+	CustomerID string
+	Amount     float64
+	Status     OrderStatus
+	CreatedAt  time.Time
 }
 ```
 
@@ -146,16 +160,16 @@ type Order struct {
 ```go
 // 依存性逆転の原則 (DIP): 上位モジュールがインターフェースを所有する
 type OrderRepository interface {
-    Save(ctx context.Context, order *entity.Order) error
-    FindByID(ctx context.Context, id string) (*entity.Order, error)
+	Save(ctx context.Context, order *entity.Order) error
+	FindByID(ctx context.Context, id string) (*entity.Order, error)
 }
 
 type InventoryClient interface {
-    CheckAndReserve(ctx context.Context, productID string, quantity int) (bool, error)
+	CheckAndReserve(ctx context.Context, productID string, quantity int) (bool, error)
 }
 
 type PaymentPublisher interface {
-    PublishPaymentTask(ctx context.Context, order *entity.Order) error
+	PublishPaymentTask(ctx context.Context, order *entity.Order) error
 }
 ```
 
@@ -170,15 +184,15 @@ type PaymentPublisher interface {
 
 ```go
 type CreateOrderUsecase struct {
-    orderRepo repository.OrderRepository // 抽象に依存
-    // ...
+	orderRepo repository.OrderRepository // 抽象に依存
+	// ...
 }
 
 func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput) error {
-    // 1. 在庫チェック (Domain Service利用)
-    // 2. 注文エンティティ作成
-    // 3. データベース保存 (Repository利用)
-    // 4. イベント発行
+	// 1. 在庫チェック (Domain Service利用)
+	// 2. 注文エンティティ作成
+	// 3. データベース保存 (Repository利用)
+	// 4. イベント発行
 }
 ```
 
@@ -187,9 +201,9 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 > **補足: 取引の一貫性（DB保存とMQ発行）**
 > この例では「DB保存 → MQ発行」を順に実行しています。現実のシステムでは、トランザクション境界や補償（Outboxパターン等）を検討し、二重送信や送信漏れを防ぐ設計が必要です。
 
-### Step 3: インフラ層の実装 (`infra/`)
+### Step 3: インターフェースアダプター層の実装 (`infra/`)
 
-ここで初めて「PostgreSQL」や「REST API」といった具体的な技術が登場します。**Step 1で定義したドメイン層のインターフェースを実装**します。
+ここで初めて「PostgreSQL」や「REST API」といった具体的な技術が登場します。**Step 1で定義したドメイン層のインターフェースを実装**します。DBドライバやSDKなどの実体は Frameworks/Drivers 側に追い出します。
 
 * `PostgresOrderRepository` は `domain.OrderRepository` を実装。
 * `RestInventoryClient` は `domain.InventoryClient` を実装。
@@ -199,14 +213,14 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 
 ```go
 type PostgresOrderRepository struct {
-    // DB接続インスタンスなど
+	// DB接続インスタンスなど
 }
 
 // domain/repository.OrderRepository インターフェースを満たす
 func (r *PostgresOrderRepository) Save(ctx context.Context, order *entity.Order) error {
-    fmt.Printf("Saving order %s to Postgres\n", order.ID)
-    // 実際のSQL実行処理...
-    return nil
+	fmt.Printf("Saving order %s to Postgres\n", order.ID)
+	// 実際のSQL実行処理...
+	return nil
 }
 ```
 
@@ -216,25 +230,25 @@ func (r *PostgresOrderRepository) Save(ctx context.Context, order *entity.Order)
 
 ```go
 func main() {
-    // 1. 依存オブジェクト（Infra）の生成
-    orderRepo := &repository.PostgresOrderRepository{}
-    inventoryClient := &client.RestInventoryClient{}
-    paymentPub := &messaging.RabbitMQPaymentPublisher{}
-    idGen := &util.UUIDGenerator{} // ID生成器の実装
+	// 1. 依存オブジェクト（Interface Adapters）の生成
+	orderRepo := &repository.PostgresOrderRepository{}
+	inventoryClient := &client.RestInventoryClient{}
+	paymentPub := &messaging.RabbitMQPaymentPublisher{}
+	idGen := &util.UUIDGenerator{} // ID生成器の実装
 
-    // 2. ドメインサービスの生成
-    orderDomainSvc := service.NewOrderDomainService(inventoryClient)
-    inventoryRepo := &repository.PostgresInventoryRepository{}
-    inventoryDomainSvc := service.NewInventoryDomainService(inventoryRepo)
+	// 2. ドメインサービスの生成
+	orderDomainSvc := service.NewOrderDomainService(inventoryClient)
+	inventoryRepo := &repository.PostgresInventoryRepository{}
+	inventoryDomainSvc := service.NewInventoryDomainService(inventoryRepo)
 
-    // 3. ユースケースへの注入
-    createOrderUsecase := usecase.NewCreateOrderUsecase(orderRepo, orderDomainSvc, paymentPub, idGen)
-    checkInventoryUsecase := usecase.NewCheckInventoryUsecase(inventoryDomainSvc)
-    updateInventoryUsecase := usecase.NewUpdateInventoryUsecase(inventoryDomainSvc)
+	// 3. ユースケースへの注入
+	createOrderUsecase := usecase.NewCreateOrderUsecase(orderRepo, orderDomainSvc, paymentPub, idGen)
+	checkInventoryUsecase := usecase.NewCheckInventoryUsecase(inventoryDomainSvc)
+	updateInventoryUsecase := usecase.NewUpdateInventoryUsecase(inventoryDomainSvc)
 
-    // 4. 実行
-    createOrderUsecase.Execute(ctx, input)
-    checkInventoryUsecase.Execute(ctx, checkInput)
+	// 4. 実行
+	createOrderUsecase.Execute(ctx, input)
+	checkInventoryUsecase.Execute(ctx, checkInput)
 }
 ```
 
@@ -262,7 +276,7 @@ go mod tidy
 go run main.go
 ```
 
-成功すると、インフラ層の実装が呼ばれ、注文処理のログ（擬似的な保存処理など）が出力されます。
+成功すると、インターフェースアダプター層の実装が呼ばれ、注文処理のログ（擬似的な保存処理など）が出力されます。
 
 ## まとめ
 

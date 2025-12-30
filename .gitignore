@@ -1,32 +1,79 @@
-# Byte-compiled / optimized / DLL files
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AI & Tools
+.serena/
+**/.serena/
+
+# Go
+# Binaries and build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+# Test coverage
+*.coverprofile
+# Dependency directory
+vendor/
+# Software specific binary
+software/advent-of-calm-2025/advent-of-calm-2025
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+*.tfvars
+*.tfvars.json
+.terraform.lock.hcl
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# AI
-.serena
-
-# C extensions
-*.so
-
-# Distribution / packaging
-build/
-dist/
 *.egg-info/
-
-# Environments
 .env
 .venv
 venv/
 env/
 
-# IDE settings
-.vscode/
-.idea/
-
-# OS-generated files
-.DS_Store
-Thumbs.db
+# Distribution / packaging
+build/
+dist/
 
 # Log files
+
 *.log
+
+
+
+# Certificates and Keys
+
+*.pem
+
+*.key
+
+*.crt
+
+*.pfx
+
+*.p12
+
+*.csr

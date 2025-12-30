@@ -24,19 +24,19 @@ package domain
 import "time"
 
 type User struct {
- ID       string
- Name     string
- JoinedAt time.Time // 入社日
+	ID       string
+	Name     string
+	JoinedAt time.Time // 入社日
 }
 
-// GetTenureYears は勤続年数を返します
+// GetTenureYears は勤続年数を返します。
 func (u *User) GetTenureYears() int {
- now := time.Now()
- years := now.Year() - u.JoinedAt.Year()
- if now.YearDay() < u.JoinedAt.YearDay() {
-  years--
- }
- return years
+	now := time.Now()
+	years := now.Year() - u.JoinedAt.Year()
+	if now.YearDay() < u.JoinedAt.YearDay() {
+		years--
+	}
+	return years
 }
 ```
 
@@ -50,9 +50,9 @@ package domain
 
 type VeteranService struct{}
 
-// IsVeteran は、ユーザーがベテラン（勤続5年以上）かどうかを判定します
-func (s *VeteranService) IsVeteran(user *User) bool {
- return user.GetTenureYears() >= 5
+// IsVeteran は、ユーザーがベテラン（勤続5年以上）かどうかを判定します。
+func (s VeteranService) IsVeteran(user *User) bool {
+	return user.GetTenureYears() >= 5
 }
 ```
 
@@ -65,21 +65,26 @@ Domain オブジェクトを組み合わせてユースケースを実現しま�
 package usecase
 
 import (
- "context"
- "your-project/domain"
+	"context"
+
+	"your-project/domain"
 )
 
 type CheckVeteranUseCase struct {
- repo       domain.UserRepository
- veteranSvc domain.VeteranService
+	repo       domain.UserRepository
+	veteranSvc domain.VeteranService
+}
+
+func NewCheckVeteranUseCase(repo domain.UserRepository, veteranSvc domain.VeteranService) *CheckVeteranUseCase {
+	return &CheckVeteranUseCase{repo: repo, veteranSvc: veteranSvc}
 }
 
 func (uc *CheckVeteranUseCase) Execute(ctx context.Context, id string) (bool, error) {
- user, err := uc.repo.FindByID(ctx, id) // リポジトリ経由で取得
- if err != nil {
-  return false, err
- }
- return uc.veteranSvc.IsVeteran(user), nil
+	user, err := uc.repo.FindByID(ctx, id) // リポジトリ経由で取得
+	if err != nil {
+		return false, err
+	}
+	return uc.veteranSvc.IsVeteran(user), nil
 }
 ```
 
@@ -97,18 +102,27 @@ func (uc *CheckVeteranUseCase) Execute(ctx context.Context, id string) (bool, er
 // infra/ad_user_repository.go
 package infra
 
-type AdUserRepository struct {
- ldapClient *LdapClient // 架空のライブラリ
+import (
+	"context"
+
+	"your-project/domain"
+)
+
+type ADUserRepository struct {
+	ldapClient *LDAPClient // 架空のライブラリ
 }
 
-func (r *AdUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
- // LDAP クエリを発行して情報を取得
- entry, _ := r.ldapClient.Search(id)
- return &domain.User{
-  ID:       entry.UID,
-  Name:     entry.DisplayName,
-  JoinedAt: entry.CreationDate,
- }, nil
+func (r *ADUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
+	// LDAP クエリを発行して情報を取得
+	entry, err := r.ldapClient.Search(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.User{
+		ID:       entry.UID,
+		Name:     entry.DisplayName,
+		JoinedAt: entry.CreationDate,
+	}, nil
 }
 ```
 
@@ -118,14 +132,14 @@ func (r *AdUserRepository) FindByID(ctx context.Context, id string) (*domain.Use
 
 ```go
 func main() {
- // 旧: sqlRepo := infra.NewSqlUserRepository(db)
- // 新:
- adRepo := infra.NewAdUserRepository(ldapClient)
+	// 旧: sqlRepo := infra.NewSQLUserRepository(db)
+	// 新:
+	adRepo := infra.NewADUserRepository(ldapClient)
 
- // UseCase は引数がインターフェースなので、adRepo をそのまま受け入れられる
- useCase := usecase.NewCheckVeteranUseCase(adRepo)
+	// UseCase は引数がインターフェースなので、adRepo をそのまま受け入れられる
+	useCase := usecase.NewCheckVeteranUseCase(adRepo, domain.VeteranService{})
 
- // この後、useCase.Execute() を呼び出すコードは一切変更不要！
+	// この後、useCase.Execute() を呼び出すコードは一切変更不要！
 }
 ```
 
@@ -140,3 +154,6 @@ func main() {
 2. **変更の局所化**:
     - データの取得先が DB から AD に変わっても、`infra` レイヤーに新しいコードを追加し、`main` での注入先を変えるだけで済みました。
     - **核心となるビジネスロジック (Domain/UseCase) には 1 行も修正が入っていません。** これがクリーンアーキテクチャの真価です。
+3. **ポートと境界**:
+    - `domain.UserRepository` は **出力ポート** であり、実装は Interface Adapters に置きます。
+    - `LDAPClient` や DB ドライバなどの詳細は Frameworks/Drivers に留め、Domain/UseCase に漏らしません。

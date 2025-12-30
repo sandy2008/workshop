@@ -21,8 +21,10 @@ Define the "notification functionality" rather than "how to send it."
 // domain/notification.go
 package domain
 
+import "context"
+
 type NotificationService interface {
- Send(ctx context.Context, message string) error
+	Send(ctx context.Context, message string) error
 }
 ```
 
@@ -37,8 +39,8 @@ package usecase
 import "context"
 
 func (uc *ApproveUseCase) Execute(ctx context.Context, userID string) error {
- // ... Approval logic ...
- return uc.notifier.Send(ctx, "Membership has been approved!")
+	// ... Approval logic ...
+	return uc.notifier.Send(ctx, "Membership has been approved!")
 }
 ```
 
@@ -48,13 +50,17 @@ Initially, use an Email implementation, but later create a Slack implementation 
 
 ```go
 // infra/slack_notifier.go (Added later)
+package infra
+
+import "context"
+
 type SlackNotifier struct {
- webhookURL string
+	webhookURL string
 }
 
 func (n *SlackNotifier) Send(ctx context.Context, msg string) error {
- // Implementation to call Slack API
- return nil
+	// Implementation to call Slack API
+	return nil
 }
 ```
 
@@ -66,29 +72,36 @@ Address the requirement: "Speed up user information retrieval. However, do not c
 
 ### 2-1. Implementing a Caching Repository
 
-Create a new Infra implementation that wraps the original `SqlUserRepository`.
+Create a new Infra implementation that wraps the original `SQLUserRepository`.
 
 ```go
 // infra/cached_user_repository.go
 package infra
 
+import (
+	"context"
+
+	"your-project/domain"
+	"github.com/redis/go-redis/v9"
+)
+
 type CachedUserRepository struct {
- origin domain.UserRepository // Real DB repository
- cache  *redis.Client         // Cache DB
+	origin domain.UserRepository // Real DB repository
+	cache  *redis.Client         // Cache DB
 }
 
 func (r *CachedUserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
- // 1. Return if in cache
- if user, err := r.getFromCache(id); err == nil {
-  return user, nil
- }
+	// 1. Return if in cache
+	if user, err := r.getFromCache(id); err == nil {
+		return user, nil
+	}
 
- // 2. Otherwise, ask the real DB
- user, err := r.origin.FindByID(ctx, id)
- if err == nil {
-  r.saveToCache(user) // Save for next time
- }
- return user, err
+	// 2. Otherwise, ask the real DB
+	user, err := r.origin.FindByID(ctx, id)
+	if err == nil {
+		_ = r.saveToCache(user) // Save for next time
+	}
+	return user, err
 }
 ```
 
@@ -98,12 +111,12 @@ In `main.go`, "wrap" the real repository with the caching repository before pass
 
 ```go
 func main() {
- realRepo := infra.NewSqlUserRepository(db)
- // Wrap the real one with caching functionality
- cachedRepo := infra.NewCachedUserRepository(realRepo, redisClient)
+	realRepo := infra.NewSQLUserRepository(db)
+	// Wrap the real one with caching functionality
+	cachedRepo := infra.NewCachedUserRepository(realRepo, redisClient)
 
- // UseCase looks at the interface, so it can accept the wrapped cachedRepo as-is
- useCase := usecase.NewCheckVeteranUseCase(cachedRepo)
+	// UseCase looks at the interface, so it can accept the wrapped cachedRepo as-is
+	useCase := usecase.NewCheckVeteranUseCase(cachedRepo, domain.VeteranService{})
 }
 ```
 
@@ -117,3 +130,6 @@ func main() {
 2. **Transparent Feature Addition (Exercise 2):**
     - As long as the interface remains the same, the caller won't notice if the internal logic changes from "retrieving from DB" to "retrieving with cache control."
     - This allows for infrastructure-level improvements (performance tuning, logging, retry logic, etc.) while keeping the business logic healthy.
+3. **Ports and Implementation Separation:**
+    - The notification interface is an output port; Slack/Email implementations live in Interface Adapters.
+    - Details like Redis clients stay in Frameworks/Drivers.

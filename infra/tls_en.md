@@ -69,6 +69,7 @@ openssl x509 -req -in server.csr -CA rootCA.crt -CAkey rootCA.key -CAcreateseria
 ## 5. Step 3: Inspecting and Verifying Certificate Content
 
 ### 3.1 Inspecting Certificate Details
+
 Display the contents of the issued certificate in text format and verify that the configured items are correctly reflected.
 
 ```bash
@@ -76,6 +77,7 @@ openssl x509 -noout -text -in server.crt
 ```
 
 #### How to read the output sample
+
 Information like the following will be displayed:
 
 ```text
@@ -106,10 +108,11 @@ Certificate:
 - **Issuer**: The CA that signed this certificate.
 - **Validity**: From `Not Before` (start) to `Not After` (end).
 - **Subject**: Information about the owner of this certificate.
-    - **CN (Common Name)**: Formerly used for identification, but SAN now takes precedence.
+  - **CN (Common Name)**: Formerly used for identification, but SAN now takes precedence.
 - **X509v3 Subject Alternative Name (SAN)**: **The most important item in modern HTTPS**. A list of domain names or IP addresses for which the certificate is valid.
 
 ### 3.2 Verifying the Certificate
+
 Verify that the issued certificate is correctly signed by the CA.
 
 ```bash
@@ -126,6 +129,7 @@ When a client such as a browser performs HTTPS communication, it validates wheth
     - **Relationship with CNAME**: CNAME is an alias at the DNS level. In certificate verification, the domain name you are ultimately accessing must be included in the SAN.
 
 ### SSL Pass-through and SAN
+
 In an **SSL Pass-through** configuration where SSL termination is not performed at the Load Balancer (LB) and the encrypted data is forwarded as is to the backend Web server, the Web server itself holds the certificate.
 
 In this case, the domain name used in front of the LB (the domain name the client accesses) must match the SAN in the Web server's certificate. If they do not match, the client will display a "security warning."
