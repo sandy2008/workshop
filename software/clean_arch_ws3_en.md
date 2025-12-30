@@ -14,21 +14,22 @@ This workshop adopts a simple and practical **4-layer structure**.
 1. **Domain Layer** - `domain/`
     * **Role**: Core business rules and data structures.
     * **Characteristics**: **Depends on nothing**. Written purely in Go.
-    * **Components**: Entities, Repository Interfaces, Domain Services.
+    * **Components**: Entities, Ports (Interfaces), Domain Services.
 
 2. **Usecase Layer** - `usecase/`
     * **Role**: Application-specific business rules (what the user wants to do).
     * **Characteristics**: Depends only on the Domain Layer. Knows nothing about the DB or HTTP details.
     * **Components**: Interactors (Usecases), Input/Output Data Structures (DTOs).
 
-3. **Interface Adapters Layer** - `infra/`
-    * **Role**: Translate external I/O to UseCase inputs and implement domain contracts.
+3. **Infra Adapter Layer** - `infra/`
+    * **Role**: Specifically implement domain contracts (Ports) and bridge to external I/O (DB, etc.).
     * **Characteristics**: **Implements the interfaces defined in the Domain Layer** (dependencies point inward).
-    * **Components**: Repository implementations, Web handlers, External clients.
+    * **Components**: Repository implementations, External client implementations, DB integration.
 
-4. **Frameworks / Drivers Layer**
-    * **Role**: Concrete technologies like DB drivers, external SDKs, web frameworks.
-    * **Characteristics**: Provide low-level I/O only; no business rules.
+4. **Framework Layer**
+    * **Role**: Web frameworks, gRPC, CLI, and their handlers.
+    * **Characteristics**: Controls the outermost I/O, converting inputs for UseCases.
+    * **Components**: Web handlers, Routers, DTO mapping.
 
 ### The Dependency Rule
 
@@ -37,13 +38,13 @@ Source code dependencies must always point from lower-level details (concrete im
 
 ```mermaid
 graph TD
-    %% External / Frameworks & Drivers
+    %% External
     Customer[Customer]
     Admin[Admin]
 
-    subgraph Gateway [Web / API / Gateway]
-        OrderAPI[Order API Endpoint]
-        InvAPI[Inventory API Endpoint]
+    subgraph FrameworkLayer [Framework]
+        OrderAPI[Order API / Handler]
+        InvAPI[Inventory API / Handler]
     end
 
     subgraph UsecaseLayer [Usecase]
@@ -58,13 +59,10 @@ graph TD
         InvDS[Inventory Domain Svc]
     end
 
-    subgraph AdapterLayer [Interface Adapters]
+    subgraph InfraLayer [Infra Adapters]
         OrderRepoImpl[Order Repository Impl]
         InvRepoImpl[Inventory Repository Impl]
         InvClientImpl[Inventory REST Client]
-    end
-
-    subgraph FrameworkLayer [Frameworks / Drivers]
         OrderDB[(Order DB)]
         InvDB[(Inventory DB)]
     end
@@ -96,23 +94,20 @@ graph TD
     OrderRepoImpl --> OrderDB
     InvRepoImpl --> InvDB
 
-    %% Service Integration & Admin Flow Unification
-    %% Both Order Service and Admin use the same Inventory API.
+    %% Service Integration
     InvClientImpl --> InvAPI
-    InvAPI --> InvUC
 
     style DomainLayer fill:#f9f,stroke:#333,stroke-width:2px
     style UsecaseLayer fill:#bbf,stroke:#333,stroke-width:2px
-    style AdapterLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style InfraLayer fill:#bfb,stroke:#333,stroke-width:2px
     style FrameworkLayer fill:#ffd,stroke:#333,stroke-width:2px
-    style Gateway fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 
 > **Note: Unifying External Interfaces**
 > `Customer` (the person ordering) and `Admin` (inventory manager) interact with the system via the appropriate API endpoints in the `Gateway` layer. Furthermore, the `Inventory REST Client` within the `Order Service` uses the same `Inventory API` as the `Admin`, centralizing all inventory-related logic within the `Inventory Usecase`.
 
 > **What are "Ports"?**
-> Ports are the "contracts (interfaces) that the inner rules demand from the outside." Details about the DB or external APIs are hidden behind Ports. Usecases and Domain Services depend on Ports to define behavior only. The outside layer (Interface Adapters) implements these Ports, keeping the dependency direction pointing inward.
+> Ports are the "contracts (interfaces) that the inner rules demand from the outside." Details about the DB or external APIs are hidden behind Ports. Usecases and Domain Services depend on Ports to define behavior only. The outside layer (Infra Adapters) implements these Ports, keeping the dependency direction pointing inward.
 
 ### Ports and Repository Boundary
 
@@ -201,7 +196,7 @@ The key point here is that `CreateOrderUsecase` does not know about the concrete
 > **Note: Transactional Consistency (DB Save vs. MQ Publish)**
 > In this example, "DB Save -> MQ Publish" are executed sequentially. In real-world systems, you should consider transaction boundaries and compensation (e.g., the Outbox pattern) to prevent double-sends or missing messages.
 
-### Step 3: Implementing the Interface Adapters Layer (`infra/`)
+### Step 3: Implementing the Infra Adapters Layer (`infra/`)
 
 This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We implement the Domain Layer interfaces defined in Step 1**. DB drivers and SDKs are pushed out to Frameworks/Drivers.
 
@@ -230,7 +225,7 @@ Finally, we wire up all the parts in `main.go` using **Dependency Injection**.
 
 ```go
 func main() {
-	// 1. Create Interface Adapters objects
+	// 1. Create Infra Adapters objects
 	orderRepo := &repository.PostgresOrderRepository{}
 	inventoryClient := &client.RestInventoryClient{}
 	paymentPub := &messaging.RabbitMQPaymentPublisher{}

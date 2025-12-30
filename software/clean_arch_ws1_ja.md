@@ -155,5 +155,5 @@ func main() {
     - データの取得先が DB から AD に変わっても、`infra` レイヤーに新しいコードを追加し、`main` での注入先を変えるだけで済みました。
     - **核心となるビジネスロジック (Domain/UseCase) には 1 行も修正が入っていません。** これがクリーンアーキテクチャの真価です。
 3. **ポートと境界**:
-    - `domain.UserRepository` は **出力ポート** であり、実装は Interface Adapters に置きます。
+    - `domain.UserRepository` は **出力ポート** であり、実装は Infra Adapters (インフラアダプター層) に置きます。
     - `LDAPClient` や DB ドライバなどの詳細は Frameworks/Drivers に留め、Domain/UseCase に漏らしません。

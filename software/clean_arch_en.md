@@ -4,19 +4,14 @@ A proposal for building loosely coupled software centered on business logic, ind
 
 ## Layer Structure and Dependencies
 
-Dependencies always point **inwards (towards the Domain)**. External inputs like Web call the UseCase, and Interface Adapters depend on the Domain through interfaces.
+Dependencies always point **inwards (towards the Domain)**. External inputs (Framework) call the UseCase, and Infra Adapters depend on the Domain through interfaces.
 
 ```mermaid
 graph TD
-    subgraph FrameworkLayer [Frameworks / Drivers]
-        Web[Web / UI / External]
-        DB[(Database)]
-    end
-
-    subgraph AdapterLayer [Interface Adapters]
+    subgraph FrameworkLayer [Framework]
+        Web[Web / gRPC / CLI]
         Controller[Controller / Handler]
         Presenter[Presenter]
-        RI_Impl[Repository Impl]
     end
 
     subgraph UseCaseLayer [UseCase]
@@ -27,6 +22,11 @@ graph TD
         DS[Domain Service]
         E[Entity]
         RI[Repository Interface]
+    end
+
+    subgraph InfraLayer [Infra Adapters]
+        RI_Impl[Repository Impl]
+        DB[(Database)]
     end
 
     %% Dependencies
@@ -46,7 +46,7 @@ The heart of the application, representing the business rules themselves.
 
 * **Entity:** Business "objects" or "concepts".
 * **Domain Service:** Knowledge or logic that spans multiple entities.
-* **Repository Interface:** An "abstract contract" regarding data persistence. Implementation is not included here.
+* **Repository Interface:** An "abstract contract (Port)" regarding data persistence. Implementation is not included here.
 
 ## 2. UseCase Layer
 
@@ -55,19 +55,19 @@ Describes the steps to realize specific "features" of the application.
 * **Role:** Manipulates objects from the Domain layer and defines the flow of processing (orchestration).
 * **Dependencies:** Depends only on the Domain layer. It is unaware of what the external database actually is.
 
-## 3. Interface Adapters Layer
+## 3. Infra Adapters Layer
 
-Responsible for translating I/O and bridging external systems to internal models.
+Specifically implements the interfaces (Ports) defined in the Domain layer and bridges external systems.
 
-* **Controller / Presenter:** Converts external requests to UseCase inputs and outputs back to external formats.
-* **Repository Impl (Adapter):** Specifically implements the interface defined in the Domain layer. Mapping and query construction live here.
+* **Repository Impl:** Implements the interface defined in the Domain layer. Mapping and query construction live here.
+* **Gateway Impl:** Implementation of external API clients, etc.
 
-## 4. Frameworks / Drivers Layer
+## 4. Framework Layer
 
-The concrete technologies and I/O implementations.
+The outermost I/O layer, such as Web frameworks or CLI.
 
-* **External Resources:** Databases, external APIs, file systems, web frameworks.
-* **Responsibility:** Provide low-level I/O; they do not hold business rules.
+* **Controller / Handler:** Converts external requests (HTTP, CLI) to UseCase inputs and calls the UseCase.
+* **Presenter:** Formats the UseCase output for external consumption (e.g., JSON).
 
 ---
 
@@ -121,9 +121,9 @@ func (uc *MembershipUseCase) Execute(ctx context.Context, userID, groupID string
 }
 ```
 
-### 3. Interface Adapters Layer
+### 3. Infra Adapters Layer
 
-Specifically implements the interface. DB driver details stay outside this layer.
+Specifically implements the interfaces (Ports) defined in the Domain layer. Details like DB drivers are isolated here to keep upper layers independent of specific technologies.
 
 ```go
 // infra/membership_repository.go

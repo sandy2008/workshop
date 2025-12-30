@@ -155,5 +155,5 @@ func main() {
     - Even when the data source changed from DB to AD, we only had to add new code to the `infra` layer and change the injection target in `main`.
     - **The core business logic (Domain/UseCase) remains untouched with zero lines of modification.** This is the true value of Clean Architecture.
 3. **Ports and Boundaries:**
-    - `domain.UserRepository` is an **output port**; implementations live in Interface Adapters.
+    - `domain.UserRepository` is an **output port**; implementations live in Infra Adapters Layer.
     - Details like `LDAPClient` or DB drivers stay in Frameworks/Drivers and never leak into Domain/UseCase.

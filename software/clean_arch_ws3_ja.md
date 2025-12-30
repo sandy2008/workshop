@@ -14,21 +14,22 @@ Clean Architecture（クリーンアーキテクチャ）は、ソフトウェ�
 1. **ドメイン層 (Domain Layer)** - `domain/`
     * **役割**: ビジネスの中核となるルールとデータ構造。
     * **特徴**: **他のどの層にも依存しません**。純粋なGoのコードのみで記述されます。
-    * **構成要素**: エンティティ (Entity), リポジトリインターフェース (Repository Interface), ドメインサービス (Domain Service)。
+    * **構成要素**: エンティティ (Entity), リポジトリインターフェース (Port), ドメインサービス (Domain Service)。
 
 2. **ユースケース層 (Usecase Layer)** - `usecase/`
     * **役割**: アプリケーション固有のビジネスルール（ユーザーが何をしたいか）。
     * **特徴**: ドメイン層にのみ依存します。DBやHTTPの詳細を知りません。
     * **構成要素**: ユースケース (Interactor), 入力/出力データ構造 (DTO)。
 
-3. **インターフェースアダプター層 (Interface Adapters)** - `infra/`
-    * **役割**: 外部I/OをUseCase向けに変換し、ドメインの契約を実装する。
+3. **インフラアダプター層 (Infra Adapters)** - `infra/`
+    * **役割**: ドメインの契約（Port）を具体的に実装し、外部I/O（DB等）との橋渡しを行う。
     * **特徴**: **ドメイン層のインターフェースに依存して実装する層**です（依存は内向き）。
-    * **構成要素**: リポジトリの実装 (Repository Impl), Webハンドラー, 外部クライアント。
+    * **構成要素**: リポジトリの実装 (Repository Impl), 外部クライアント (Client Impl), DB 連携。
 
-4. **フレームワーク層 (Frameworks / Drivers)**
-    * **役割**: DBドライバ、外部API SDK、Webフレームワークなどの具体技術。
-    * **特徴**: 低レベルI/Oのみを提供し、ビジネスルールは持ちません。
+4. **フレームワーク層 (Framework Layer)**
+    * **役割**: Web フレームワーク、gRPC、CLI、およびそれらのハンドラー。
+    * **特徴**: 最外周の I/O を制御し、入力を UseCase 向けに変換して呼び出します。
+    * **構成要素**: Web ハンドラー, Router, DTO 変換。
 
 ### 依存性のルール (The Dependency Rule)
 
@@ -37,13 +38,13 @@ Clean Architecture（クリーンアーキテクチャ）は、ソフトウェ�
 
 ```mermaid
 graph TD
-    %% 外部要素 (Frameworks & Drivers / External)
+    %% 外部要素 (External)
     Customer[Customer]
     Admin[Admin]
 
-    subgraph Gateway [Web / API / Gateway]
-        OrderAPI[Order API Endpoint]
-        InvAPI[Inventory API Endpoint]
+    subgraph FrameworkLayer [Framework]
+        OrderAPI[Order API / Handler]
+        InvAPI[Inventory API / Handler]
     end
 
     subgraph UsecaseLayer [Usecase]
@@ -58,13 +59,10 @@ graph TD
         InvDS[Inventory Domain Svc]
     end
 
-    subgraph AdapterLayer [Interface Adapters]
+    subgraph InfraLayer [Infra Adapters]
         OrderRepoImpl[Order Repository Impl]
         InvRepoImpl[Inventory Repository Impl]
         InvClientImpl[Inventory REST Client]
-    end
-
-    subgraph FrameworkLayer [Frameworks / Drivers]
         OrderDB[(Order DB)]
         InvDB[(Inventory DB)]
     end
@@ -96,23 +94,20 @@ graph TD
     OrderRepoImpl --> OrderDB
     InvRepoImpl --> InvDB
 
-    %% サービス間連携とAdminフローの統一
-    %% OrderサービスもAdminも同じInventory APIを利用する
+    %% サービス間連携
     InvClientImpl --> InvAPI
-    InvAPI --> InvUC
 
     style DomainLayer fill:#f9f,stroke:#333,stroke-width:2px
     style UsecaseLayer fill:#bbf,stroke:#333,stroke-width:2px
-    style AdapterLayer fill:#bfb,stroke:#333,stroke-width:2px
+    style InfraLayer fill:#bfb,stroke:#333,stroke-width:2px
     style FrameworkLayer fill:#ffd,stroke:#333,stroke-width:2px
-    style Gateway fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 
 > **注記: 外部インターフェースの集約**
 > `Customer`（注文者）と `Admin`（在庫管理者）は、それぞれ `Gateway` レイヤーの適切な API エンドポイントを叩きます。また、`Order Service` 内の `Inventory REST Client` も、`Admin` と同じ `Inventory API` を利用することで、在庫操作のロジックを一箇所（Inventory UseCase）に集中させています。
 
 > **Ports とは？**
-> Ports は「内側のルールが外側に求める契約（インターフェース）」です。DBや外部APIの詳細は Ports の背後に隠れ、ユースケースやドメインサービスは Ports に依存して振る舞いだけを定義します。外側（Interface Adapters）は Ports を実装することで依存方向を内向きに保ちます。
+> Ports は「内側のルールが外側に求める契約（インターフェース）」です。DBや外部APIの詳細は Ports の背後に隠れ、ユースケースやドメインサービスは Ports に依存して振る舞いだけを定義します。外側（Infra Adapters）は Ports を実装することで依存方向を内向きに保ちます。
 
 ### ポート設計とリポジトリ境界
 
@@ -201,7 +196,7 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 > **補足: 取引の一貫性（DB保存とMQ発行）**
 > この例では「DB保存 → MQ発行」を順に実行しています。現実のシステムでは、トランザクション境界や補償（Outboxパターン等）を検討し、二重送信や送信漏れを防ぐ設計が必要です。
 
-### Step 3: インターフェースアダプター層の実装 (`infra/`)
+### Step 3: インフラアダプター層の実装 (`infra/`)
 
 ここで初めて「PostgreSQL」や「REST API」といった具体的な技術が登場します。**Step 1で定義したドメイン層のインターフェースを実装**します。DBドライバやSDKなどの実体は Frameworks/Drivers 側に追い出します。
 
@@ -230,7 +225,7 @@ func (r *PostgresOrderRepository) Save(ctx context.Context, order *entity.Order)
 
 ```go
 func main() {
-	// 1. 依存オブジェクト（Interface Adapters）の生成
+	// 1. 依存オブジェクト（Infra Adapters）の生成
 	orderRepo := &repository.PostgresOrderRepository{}
 	inventoryClient := &client.RestInventoryClient{}
 	paymentPub := &messaging.RabbitMQPaymentPublisher{}
@@ -276,7 +271,7 @@ go mod tidy
 go run main.go
 ```
 
-成功すると、インターフェースアダプター層の実装が呼ばれ、注文処理のログ（擬似的な保存処理など）が出力されます。
+成功すると、インフラアダプター層の実装が呼ばれ、注文処理のログ（擬似的な保存処理など）が出力されます。
 
 ## まとめ
 

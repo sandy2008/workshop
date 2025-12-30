@@ -4,19 +4,14 @@
 
 ## レイヤー構造と依存関係
 
-依存関係は常に **内側（Domain）** に向かいます。外部入力（Web / UI など）は UseCase を呼び出し、Interface Adapters はインターフェースを介して Domain に依存します。
+依存関係は常に **内側（Domain）** に向かいます。外部入力（Framework）は UseCase を呼び出し、Infra Adapters はインターフェースを介して Domain に依存します。
 
 ```mermaid
 graph TD
-    subgraph FrameworkLayer [Frameworks / Drivers]
-        Web[Web / UI / External]
-        DB[(Database)]
-    end
-
-    subgraph AdapterLayer [Interface Adapters]
+    subgraph FrameworkLayer [Framework]
+        Web[Web / gRPC / CLI]
         Controller[Controller / Handler]
         Presenter[Presenter]
-        RI_Impl[Repository Impl]
     end
 
     subgraph UseCaseLayer [UseCase]
@@ -27,6 +22,11 @@ graph TD
         DS[Domain Service]
         E[Entity]
         RI[Repository Interface]
+    end
+
+    subgraph InfraLayer [Infra Adapters]
+        RI_Impl[Repository Impl]
+        DB[(Database)]
     end
 
     %% 依存関係
@@ -46,7 +46,7 @@ graph TD
 
 * **Entity (エンティティ):** ビジネス上の「物」や「概念」。
 * **Domain Service (ドメインサービス):** 複数のエンティティに跨る知識やロジック。
-* **Repository Interface:** データの永続化に関する「抽象的な約束」。実装はここには含みません。
+* **Repository Interface:** データの永続化に関する「抽象的な約束（Port）」。実装はここには含みません。
 
 ## 2. UseCase (ユースケース層)
 
@@ -55,19 +55,19 @@ graph TD
 * **役割:** Domain 層のオブジェクトを操作し、一連の処理の流れ（オーケストレーション）を定義します。
 * **依存先:** Domain 層にのみ依存します。外部のデータベースが何であるかは意識しません。
 
-## 3. Interface Adapters (インターフェースアダプター層)
+## 3. Infra Adapters (インフラアダプター層)
 
-入出力の変換や、外部技術と内側のモデルをつなぐ責務を担います。
+ドメイン層で定義されたインターフェース（Port）を具体的に実装し、外部技術との橋渡しを担います。
 
-* **Controller / Presenter:** 外部リクエストを UseCase に合わせて整形し、出力も外部向けに変換します。
-* **Repository Impl (Adapter):** Domain 層で定義されたインターフェースを具体的に実装します。データのマッピングやクエリ組み立てはここで行います。
+* **Repository Impl:** Domain 層のリポジトリインターフェースを実装します。データのマッピングやクエリ組み立て、DBエラーの変換を行います。
+* **Gateway Impl:** 外部 API クライアントなどの実装。
 
-## 4. Frameworks / Drivers (フレームワーク層)
+## 4. Framework (フレームワーク層)
 
-外部の具体的な技術や I/O の実体です。
+Web フレームワークや CLI など、最外周の I/O 層です。
 
-* **外部リソース:** データベース、外部API、ファイルシステム、Webフレームワークなど。
-* **責務:** 低レベル I/O を提供するだけで、ビジネスルールは持ちません。
+* **Controller / Handler:** HTTP リクエストや CLI 引数を UseCase の入力形式に変換し、UseCase を呼び出します。
+* **Presenter:** UseCase の実行結果を外部向けのレスポンス形式（JSON など）に整形します。
 
 ---
 
@@ -121,9 +121,9 @@ func (uc *MembershipUseCase) Execute(ctx context.Context, userID, groupID string
 }
 ```
 
-### 3. Interface Adapters 層
+### 3. Infra Adapters 層
 
-インターフェースを具体的に実装します。DB ドライバなどの詳細はここから外側（Frameworks）に追い出します。
+Domain 層で定義されたインターフェース（Port）を具体的に実装します。DB ドライバなどの詳細はここから分離し、上位レイヤーが特定の技術に依存しないようにします。
 
 ```go
 // infra/membership_repository.go
