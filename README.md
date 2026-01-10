@@ -29,8 +29,8 @@ This repository contains hands-on materials for various technical topics.
   - SSL termination, routing, and health checks with Traefik + multiple backend containers.
 - Service Mesh Fundamentals: Understanding L7 Traffic Control with Envoy Sidecars (Planned)
   - Manually deploy Envoy proxies for traffic control (retries, timeouts, routing).
-- Container Runtime Workshop: Understanding the Reality of Containers through namespaces and cgroups (Planned)
-  - Replicate the magic behind `docker run` by manually creating namespaces/cgroups.
+- [Container Runtime Workshop: Understanding the Reality of Containers through namespaces and cgroups](./infra/container_runtime_en.md)
+  - Replicate the magic behind `podman run` by manually creating namespaces/cgroups.
 - Message Queue Workshop: Learning Pub/Sub and Queuing with RabbitMQ (Planned)
   - Asynchronous messaging with RabbitMQ + Producer/Consumer containers.
 - Object Storage Workshop: Learning S3-Compatible API with MinIO (Planned)

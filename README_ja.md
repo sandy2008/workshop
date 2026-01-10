@@ -29,8 +29,8 @@
   - Traefik + 複数バックエンドコンテナで SSL 終端・ルーティング・ヘルスチェック
 - サービスメッシュ基礎実習：Envoy サイドカーで理解する L7 トラフィック制御（予定）
   - Envoy プロキシを手動配置してトラフィック制御（リトライ・タイムアウト・ルーティング）
-- コンテナランタイム実習：namespaces と cgroups で理解するコンテナの正体（予定）
-  - 手動で namespace/cgroup を作成し、`docker run` の裏側を再現
+- [コンテナランタイム実習：namespaces と cgroups で理解するコンテナの正体](./infra/container_runtime_ja.md)
+  - 手動で namespace/cgroup を作成し、`podman run` の裏側を再現
 - メッセージキュー実習：RabbitMQ で学ぶ Pub/Sub とキューイング（予定）
   - RabbitMQ + Producer/Consumer コンテナで非同期メッセージング
 - オブジェクトストレージ実習：MinIO で学ぶ S3 互換 API（予定）
