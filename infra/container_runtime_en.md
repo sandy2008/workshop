@@ -81,6 +81,23 @@ You now have the standard Alpine Linux directory structure (`bin`, `etc`, `lib`,
 
 Linux `namespaces` are a feature that limits and isolates the system resources visible to a process. We will experience the following three main ones.
 
+```mermaid
+graph TD
+    subgraph Host ["Host OS"]
+        subgraph NS1 ["Namespace 1 (Container)"]
+            P1["PID 1 (sh)"]
+            P2["PID 2 (ps)"]
+        end
+        subgraph NS2 ["Namespace 2 (Container)"]
+            P3["PID 1 (sh)"]
+        end
+        HP1["Host PID 1234 (sh)"]
+        HP2["Host PID 1235 (sh)"]
+    end
+    style NS1 fill:#f9f,stroke:#333,stroke-width:2px
+    style NS2 fill:#bbf,stroke:#333,stroke-width:2px
+```
+
 1. **PID Namespace:** Isolation of Process IDs.
 2. **Mount Namespace:** Isolation of mount points (filesystem).
 3. **Network Namespace:** Isolation of the network stack (NIC, IP, routing, etc.).
@@ -205,6 +222,15 @@ In modern Linux (such as Ubuntu 24.04), **cgroups v2** is the standard. In cgrou
 
 On the host side, create a group to limit resources. In cgroups v2, only resources (controllers) allowed in the parent directory can be limited in the child directory.
 
+```mermaid
+graph TD
+    Root["/sys/fs/cgroup (Root)"]
+    Root --> WS["workshop/"]
+    WS --> MMax["memory.max (50MB)"]
+    WS --> SMax["memory.swap.max (0)"]
+    WS --> Procs["cgroup.procs (Container PID)"]
+```
+
 ```bash
 # 1. Enable memory controller in the parent directory (root)
 # This allows memory limits to be used in child directories
@@ -323,6 +349,17 @@ sudo rmdir /sys/fs/cgroup/workshop
 ## Step 4. Network Connection via Virtual Ethernet (veth)
 
 As seen in Step 2-3, an isolated Network namespace cannot communicate with the outside. To bridge this, we use a **veth (virtual ethernet)** pair, which acts as a virtual LAN cable.
+
+```mermaid
+graph LR
+    subgraph Host ["Host Network Namespace"]
+        VH["veth-host<br/>10.0.0.1/24"]
+    end
+    subgraph Child ["Container Network Namespace"]
+        VC["veth-child<br/>10.0.0.2/24"]
+    end
+    VH --- VC
+```
 
 veth is always created in pairs; packets entering one end come out the other. By placing one end on the host and the other in the container (namespace), we enable communication.
 
@@ -457,77 +494,77 @@ Create `main.go` in your working directory.
 package main
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"syscall"
+ "fmt"
+ "os"
+ "os/exec"
+ "syscall"
 )
 
 func main() {
-	// Branch processing based on execution arguments
-	// "run" to start the container, "child" to execute inside isolated space
-	switch os.Args[1] {
-	case "run":
-		run()
-	case "child":
-		child()
-	default:
-		panic("invalid command")
-	}
+ // Branch processing based on execution arguments
+ // "run" to start the container, "child" to execute inside isolated space
+ switch os.Args[1] {
+ case "run":
+  run()
+ case "child":
+  child()
+ default:
+  panic("invalid command")
+ }
 }
 
 func run() {
-	fmt.Printf("Running %v as PID %d\n", os.Args[2:], os.Getpid())
+ fmt.Printf("Running %v as PID %d\n", os.Args[2:], os.Getpid())
 
-	// Re-execute itself with "child" argument
-	// Set Cloneflags to create new namespaces at that time
-	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+ // Re-execute itself with "child" argument
+ // Set Cloneflags to create new namespaces at that time
+ cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
+ cmd.Stdin = os.Stdin
+ cmd.Stdout = os.Stdout
+ cmd.Stderr = os.Stderr
 
-	// Namespace isolation settings
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | // Hostname isolation
-					syscall.CLONE_NEWPID | // PID isolation
-					syscall.CLONE_NEWNS | // Mount point isolation
-					syscall.CLONE_NEWNET, // Network isolation
-	}
+ // Namespace isolation settings
+ cmd.SysProcAttr = &syscall.SysProcAttr{
+  Cloneflags: syscall.CLONE_NEWUTS | // Hostname isolation
+     syscall.CLONE_NEWPID | // PID isolation
+     syscall.CLONE_NEWNS | // Mount point isolation
+     syscall.CLONE_NEWNET, // Network isolation
+ }
 
-	if err := cmd.Run(); err != nil {
-		fmt.Printf("Error running child: %v\n", err)
-		os.Exit(1)
-	}
+ if err := cmd.Run(); err != nil {
+  fmt.Printf("Error running child: %v\n", err)
+  os.Exit(1)
+ }
 }
 
 func child() {
-	fmt.Printf("Running child %v as PID %d\n", os.Args[2:], os.Getpid())
+ fmt.Printf("Running child %v as PID %d\n", os.Args[2:], os.Getpid())
 
-	// 1. Change root filesystem (chroot)
-	if err := syscall.Chroot("rootfs"); err != nil {
-		panic(err)
-	}
-	if err := os.Chdir("/"); err != nil {
-		panic(err)
-	}
+ // 1. Change root filesystem (chroot)
+ if err := syscall.Chroot("rootfs"); err != nil {
+  panic(err)
+ }
+ if err := os.Chdir("/"); err != nil {
+  panic(err)
+ }
 
-	// 2. Mount /proc
-	// This makes only processes inside the container visible
-	if err := syscall.Mount("proc", "proc", "proc", 0, ""); err != nil {
-		fmt.Printf("Error mounting proc: %v\n", err)
-	}
+ // 2. Mount /proc
+ // This makes only processes inside the container visible
+ if err := syscall.Mount("proc", "proc", "proc", 0, ""); err != nil {
+  fmt.Printf("Error mounting proc: %v\n", err)
+ }
 
-	// 3. Execute specified command (replace current process)
-	// Since it's after chroot, the path must be treated as an absolute path from "/" in rootfs.
-	// syscall.Exec(path, args, env)
-	// - path: Path to the executable binary
-	// - args: Slice of arguments including the program name
-	// - env: Slice of environment variables
-	command := os.Args[2]
-	if err := syscall.Exec(command, os.Args[2:], os.Environ()); err != nil {
-		fmt.Printf("Error executing %s: %v\n", command, err)
-		os.Exit(1)
-	}
+ // 3. Execute specified command (replace current process)
+ // Since it's after chroot, the path must be treated as an absolute path from "/" in rootfs.
+ // syscall.Exec(path, args, env)
+ // - path: Path to the executable binary
+ // - args: Slice of arguments including the program name
+ // - env: Slice of environment variables
+ command := os.Args[2]
+ if err := syscall.Exec(command, os.Args[2:], os.Environ()); err != nil {
+  fmt.Printf("Error executing %s: %v\n", command, err)
+  os.Exit(1)
+ }
 }
 ```
 

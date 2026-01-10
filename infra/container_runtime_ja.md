@@ -81,6 +81,23 @@ ls rootfs
 
 Linux の `namespaces` は、プロセスから見えるシステムリソースを制限・隔離する機能です。主要なものとして、以下の 3 つを体験します。
 
+```mermaid
+graph TD
+    subgraph Host ["Host OS"]
+        subgraph NS1 ["Namespace 1 (Container)"]
+            P1["PID 1 (sh)"]
+            P2["PID 2 (ps)"]
+        end
+        subgraph NS2 ["Namespace 2 (Container)"]
+            P3["PID 1 (sh)"]
+        end
+        HP1["Host PID 1234 (sh)"]
+        HP2["Host PID 1235 (sh)"]
+    end
+    style NS1 fill:#f9f,stroke:#333,stroke-width:2px
+    style NS2 fill:#bbf,stroke:#333,stroke-width:2px
+```
+
 1. **PID Namespace:** プロセス ID の隔離。
 2. **Mount Namespace:** マウントポイント（ファイルシステム）の隔離。
 3. **Network Namespace:** ネットワークスタック（NIC, IP, ルーティングなど）の隔離。
@@ -205,6 +222,15 @@ exit
 
 ホスト側で、リソースを制限するためのグループを作成します。cgroup v2 では、親ディレクトリで許可されたリソース（コントローラー）のみが子ディレクトリで制限可能です。
 
+```mermaid
+graph TD
+    Root["/sys/fs/cgroup (Root)"]
+    Root --> WS["workshop/"]
+    WS --> MMax["memory.max (50MB)"]
+    WS --> SMax["memory.swap.max (0)"]
+    WS --> Procs["cgroup.procs (Container PID)"]
+```
+
 ```bash
 # 1. 親ディレクトリ (root) でメモリコントローラーを有効化
 # これにより、配下の子ディレクトリでメモリ制限が使えるようになります
@@ -323,6 +349,17 @@ sudo rmdir /sys/fs/cgroup/workshop
 ## Step 4. 仮想イーサネット (veth) によるネットワーク接続
 
 Step 2-3 で見た通り、隔離された Network 名前空間は外部と通信できません。これをつなぐために、仮想的な LAN ケーブルである **veth (virtual ethernet)** ペアを使用します。
+
+```mermaid
+graph LR
+    subgraph Host ["Host Network Namespace"]
+        VH["veth-host<br/>10.0.0.1/24"]
+    end
+    subgraph Child ["Container Network Namespace"]
+        VC["veth-child<br/>10.0.0.2/24"]
+    end
+    VH --- VC
+```
 
 veth は常にペアで作成され、一方に入力されたパケットはもう一方から出てきます。これを利用して、一方をホスト側に、もう一方をコンテナ（名前空間）側に配置することで通信を可能にします。
 
