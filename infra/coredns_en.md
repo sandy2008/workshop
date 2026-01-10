@@ -6,7 +6,7 @@ This workshop is for software engineers to learn the basic mechanisms of DNS (Au
 
 Build and understand the following configuration **hands-on**.
 
-```
+```text
                      DNS Query (test.foo.sokoide.com)
 [ Client ] -------------------------------------------------> [ VM1: Parent DNS ]
 (Your PC/VM)               (1) Query Port 10053                 | 192.168.100.10

@@ -75,7 +75,7 @@ The outermost I/O layer, such as Web frameworks or CLI.
 
 A simple example determining if a user belongs to a specific group shows the implementation image of each layer.
 
-### 1. Domain Layer
+### 1. Domain Layer (Implementation)
 
 Defines business rules (interfaces).
 
@@ -91,7 +91,7 @@ type MembershipRepository interface {
 }
 ```
 
-### 2. UseCase Layer
+### 2. UseCase Layer (Implementation)
 
 Defines business "procedures". Uses Domain interfaces.
 
@@ -121,7 +121,7 @@ func (uc *MembershipUseCase) Execute(ctx context.Context, userID, groupID string
 }
 ```
 
-### 3. Infra Adapters Layer
+### 3. Infra Adapters Layer (Implementation)
 
 Specifically implements the interfaces (Ports) defined in the Domain layer. Details like DB drivers are isolated here to keep upper layers independent of specific technologies.
 

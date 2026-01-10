@@ -142,5 +142,3 @@ In this case, the domain name used in front of the LB (the domain name the clien
 - **CSR (.csr)**: An "application form" to have the CA issue a certificate.
 - **Certificate (.crt)**: The application form stamped (signed) by the CA.
 - **Root Certificate**: By installing this into a client (browser, etc.), you can trust all certificates issued by that CA.
-
-```

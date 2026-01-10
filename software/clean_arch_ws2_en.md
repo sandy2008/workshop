@@ -132,4 +132,4 @@ func main() {
     - This allows for infrastructure-level improvements (performance tuning, logging, retry logic, etc.) while keeping the business logic healthy.
 3. **Ports and Implementation Separation:**
     - The notification interface is an output port; Slack/Email implementations live in Infra Adapters Layer.
-    - Details like Redis clients stay in Frameworks/Drivers.
+    - Details like Redis clients stay in the Framework Layer.

@@ -105,7 +105,7 @@ graph TD
 
 > **注記: 外部インターフェースの集約**
 > `Customer`（注文者）と `Admin`（在庫管理者）は、それぞれ `Gateway` レイヤーの適切な API エンドポイントを叩きます。また、`Order Service` 内の `Inventory REST Client` も、`Admin` と同じ `Inventory API` を利用することで、在庫操作のロジックを一箇所（Inventory UseCase）に集中させています。
-
+>
 > **Ports とは？**
 > Ports は「内側のルールが外側に求める契約（インターフェース）」です。DBや外部APIの詳細は Ports の背後に隠れ、ユースケースやドメインサービスは Ports に依存して振る舞いだけを定義します。外側（Infra Adapters）は Ports を実装することで依存方向を内向きに保ちます。
 
@@ -129,7 +129,7 @@ graph TD
 2. **Interface**: データの永続化や外部連携のための契約（例: `OrderRepository`, `InventoryClient`）。
 3. **Domain Service**: 複数のエンティティにまたがるロジック（例: `OrderDomainService`）。
 
-**ドメインサービスのルール例**
+#### ドメインサービスのルール例
 
 * `OrderDomainService`: ProductID が空ならエラー、数量が 0 以下ならエラー。
 * `InventoryDomainService`: ProductID が空ならエラー、在庫数量が負ならエラー。
@@ -198,7 +198,7 @@ func (u *CreateOrderUsecase) Execute(ctx context.Context, input CreateOrderInput
 
 ### Step 3: インフラアダプター層の実装 (`infra/`)
 
-ここで初めて「PostgreSQL」や「REST API」といった具体的な技術が登場します。**Step 1で定義したドメイン層のインターフェースを実装**します。DBドライバやSDKなどの実体は Frameworks/Drivers 側に追い出します。
+ここで初めて「PostgreSQL」や「REST API」といった具体的な技術が登場します。**Step 1で定義したドメイン層のインターフェースを実装**します。DBドライバやSDKなどの実体は フレームワーク層 側に追い出します。
 
 * `PostgresOrderRepository` は `domain.OrderRepository` を実装。
 * `RestInventoryClient` は `domain.InventoryClient` を実装。

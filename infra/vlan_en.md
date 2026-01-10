@@ -377,5 +377,3 @@ sudo ip link delete $IF.20
 1. **macvlan** is a technology that makes containers appear as if they are directly connected to the physical network (L2).
 2. By using **VLAN** subinterfaces, you can logically separate networks over a single physical cable.
 3. **Linux Containers** can function as high-performance routers easily with appropriate settings (`ip_forward`, `iptables`).
-
-```

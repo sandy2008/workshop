@@ -156,4 +156,4 @@ func main() {
     - **核心となるビジネスロジック (Domain/UseCase) には 1 行も修正が入っていません。** これがクリーンアーキテクチャの真価です。
 3. **ポートと境界**:
     - `domain.UserRepository` は **出力ポート** であり、実装は Infra Adapters (インフラアダプター層) に置きます。
-    - `LDAPClient` や DB ドライバなどの詳細は Frameworks/Drivers に留め、Domain/UseCase に漏らしません。
+    - `LDAPClient` や DB ドライバなどの詳細は Framework (フレームワーク層) に留め、Domain/UseCase に漏らしません。

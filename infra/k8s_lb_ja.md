@@ -171,11 +171,11 @@ sudo podman exec router iptables -D FORWARD -i eth1 -o eth2 -j DROP
 
 ## 解説：K8s との対応
 
-| 今回の操作                 | K8s のコンポーネント / 設定                                             |
-| :------------------------- | :---------------------------------------------------------------------- |
-| `ip addr add ... dev eth1` | **MetalLB (Speaker)** <br> リーダー選出されたノードが IP を広報する。   |
-| `iptables ... -j DNAT`     | **kube-proxy** <br> Service/NodePort へのアクセスを Pod IP に変換する。 |
-| `iptables ... -j DROP`     | **NetworkPolicy** (Deny All) <br> 不要な直接通信を遮断する。            |
+| 今回の操作 | K8s のコンポーネント / 設定 |
+| :--- | :--- |
+| `ip addr add ... dev eth1` | **MetalLB (Speaker)** <br> リーダー選出されたノードが IP を広報する。 |
+| `iptables ... -j DNAT` | **kube-proxy** <br> Service/NodePort へのアクセスを Pod IP に変換する。 |
+| `iptables ... -j DROP` | **NetworkPolicy** (Deny All) <br> 不要な直接通信を遮断する。 |
 
 **補足:** kube-proxy は VIP を持たず、Service/NodePort へのトラフィックを Pod に振り分けるだけです。VIP の広告は LB 側（MetalLB やクラウド LB）が担います。
 

@@ -105,7 +105,7 @@ graph TD
 
 > **Note: Unifying External Interfaces**
 > `Customer` (the person ordering) and `Admin` (inventory manager) interact with the system via the appropriate API endpoints in the `Gateway` layer. Furthermore, the `Inventory REST Client` within the `Order Service` uses the same `Inventory API` as the `Admin`, centralizing all inventory-related logic within the `Inventory Usecase`.
-
+>
 > **What are "Ports"?**
 > Ports are the "contracts (interfaces) that the inner rules demand from the outside." Details about the DB or external APIs are hidden behind Ports. Usecases and Domain Services depend on Ports to define behavior only. The outside layer (Infra Adapters) implements these Ports, keeping the dependency direction pointing inward.
 
@@ -129,7 +129,7 @@ The Domain Layer is the **heart** of the application and consists of the followi
 2. **Interface**: Contracts for data persistence or external integration (e.g., `OrderRepository`, `InventoryClient`).
 3. **Domain Service**: Logic that spans multiple entities (e.g., `OrderDomainService`).
 
-**Domain Service Rule Examples**
+#### Domain Service Rule Examples
 
 * `OrderDomainService`: Error if `ProductID` is empty, or if quantity is 0 or less.
 * `InventoryDomainService`: Error if `ProductID` is empty, or if stock quantity is negative.
@@ -198,7 +198,7 @@ The key point here is that `CreateOrderUsecase` does not know about the concrete
 
 ### Step 3: Implementing the Infra Adapters Layer (`infra/`)
 
-This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We implement the Domain Layer interfaces defined in Step 1**. DB drivers and SDKs are pushed out to Frameworks/Drivers.
+This is where concrete technologies like "PostgreSQL" or "REST API" appear. **We implement the Domain Layer interfaces defined in Step 1**. DB drivers and SDKs are pushed out to the Framework Layer.
 
 * `PostgresOrderRepository` implements `domain.OrderRepository`.
 * `RestInventoryClient` implements `domain.InventoryClient`.

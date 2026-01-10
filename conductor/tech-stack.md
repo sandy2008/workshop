@@ -5,10 +5,11 @@
 ## Core
 
 - **Programming Language:** Go (v1.25.5)
-- **Architecture:** 3-Layer Clean Architecture
+- **Architecture:** 4-Layer Clean Architecture
   - **Domain:** Pure Go (No external dependencies)
   - **Usecase:** Application logic, orchestration
-  - **Infrastructure:** Adapters for external systems
+  - **Infra Adapters:** Adapters for external systems (DB, external APIs)
+  - **Framework:** Outermost I/O (Web, gRPC, CLI)
 
 ## Communication & Integration
 

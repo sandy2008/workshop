@@ -6,7 +6,7 @@
 
 以下の構成を **手を動かして構築し、理解** します。
 
-```
+```text
                      DNS Query (test.foo.sokoide.com)
 [ Client ] -------------------------------------------------> [ VM1: Parent DNS ]
 (Your PC/VM)               (1) Query Port 10053                 | 192.168.100.10

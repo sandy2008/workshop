@@ -249,5 +249,3 @@ MetalLB has several modes of operation, but the simplest and most common one is 
     * If the leader node goes down, another node is elected as the new leader, takes over ownership of the VIP, and begins responding to ARP requests. This prevents the leader node from being a single point of failure.
 
 A more advanced **BGP Mode** is also available, which allows for true load balancing and faster failover by peering with a physical router and exchanging routing information.
-
-```

@@ -156,4 +156,4 @@ func main() {
     - **The core business logic (Domain/UseCase) remains untouched with zero lines of modification.** This is the true value of Clean Architecture.
 3. **Ports and Boundaries:**
     - `domain.UserRepository` is an **output port**; implementations live in Infra Adapters Layer.
-    - Details like `LDAPClient` or DB drivers stay in Frameworks/Drivers and never leak into Domain/UseCase.
+    - Details like `LDAPClient` or DB drivers stay in the Framework Layer and never leak into Domain/UseCase.

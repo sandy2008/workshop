@@ -8,11 +8,11 @@ In this part, you will learn the basic concepts and commands of Terraform by usi
 
 ### 1. Prerequisites
 
-**Install Terraform**
+#### Install Terraform
 
 Please follow the [official guide](https://learn.hashicorp.com/tutorials/terraform/install-cli) to install Terraform on your operating system.
 
-**Create a Working Directory**
+#### Create a Working Directory
 
 ```bash
 mkdir terraform-handson
@@ -164,7 +164,7 @@ graph LR
 
 ### 1. Preparation
 
-**Create a Working Directory**
+#### Create a Working Directory (Part 2)
 
 ```bash
 cd ../
@@ -172,7 +172,7 @@ mkdir part2
 cd part2
 ```
 
-**Create a CoreDNS Container Image**
+#### Create a CoreDNS Container Image
 
 1. Create a container image that includes CoreDNS (DNS server software). Create a `Dockerfile` with the following content.
 

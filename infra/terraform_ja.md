@@ -8,11 +8,11 @@
 
 ### 1. 準備
 
-**Terraformのインストール**
+#### Terraformのインストール
 
 [公式サイトの手順](https://learn.hashicorp.com/tutorials/terraform/install-cli)に従って、お使いのOSにTerraformをインストールしてください。
 
-**作業ディレクトリの作成**
+#### 作業ディレクトリの作成
 
 ```bash
 mkdir terraform-handson
@@ -162,9 +162,9 @@ graph LR
 * `container-b`: `foo.sokoide.com`の権威DNSサーバーとして機能します。
 * `container-router`: `dig`コマンドを実行して名前解決をテストするためのクライアントです。
 
-### 1. 準備
+### 1. 準備 (パート2)
 
-**作業ディレクトリの作成**
+#### 作業ディレクトリの作成 (パート2)
 
 ```bash
 cd ../
@@ -172,7 +172,7 @@ mkdir part2
 cd part2
 ```
 
-**CoreDNSコンテナイメージの作成**
+#### CoreDNSコンテナイメージの作成
 
 1. CoreDNS（DNSサーバーソフトウェア）を含むコンテナイメージを作成します。以下の内容で`Dockerfile`を作成してください。
 
