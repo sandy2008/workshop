@@ -17,6 +17,7 @@ Thumbs.db
 # AI & Tools
 .serena/
 **/.serena/
+conductor/archive
 
 # Go
 # Binaries and build artifacts

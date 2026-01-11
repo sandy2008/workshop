@@ -31,8 +31,10 @@
   - Envoy プロキシを手動配置してトラフィック制御（リトライ・タイムアウト・ルーティング）
 - [コンテナランタイム実習：namespaces と cgroups で理解するコンテナの正体](./infra/container_runtime_ja.md)
   - 手動で namespace/cgroup を作成し、`podman run` の裏側を再現
-- メッセージキュー実習：RabbitMQ で学ぶ Pub/Sub とキューイング（予定）
-  - RabbitMQ + Producer/Consumer コンテナで非同期メッセージング
+- [Redis 実習：Sorted Sets で作るリアルタイム・ゲームランキング](./infra/cache_ja.md)
+  - Redis の Sorted Sets を活用した高速なランキングシステム構築と、Sets による不正ユーザー管理を学習
+- [メッセージキュー実習：RabbitMQ で学ぶ Pub/Sub とキューイング](./infra/rabbitmq_ja.md)
+  - RabbitMQ の Topic Exchange を活用したリアルタイム仮想通貨監視システム構築
 - オブジェクトストレージ実習：MinIO で学ぶ S3 互換 API（予定）
   - MinIO 構築 + AWS CLI/SDK でバケット操作・署名付き URL 生成
 - 監視基盤実習：Prometheus + Grafana によるメトリクス収集と可視化（予定）

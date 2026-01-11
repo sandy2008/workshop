@@ -21,6 +21,7 @@
 ## Data Management
 
 - **Primary Database:** PostgreSQL (Simulated implementation for workshop simplicity, focused on repository patterns).
+- **Caching & Real-time Data:** Redis (Sorted Sets for leaderboards, Sets for filtering).
 
 ## Tools & Automation
 

@@ -31,8 +31,10 @@ This repository contains hands-on materials for various technical topics.
   - Manually deploy Envoy proxies for traffic control (retries, timeouts, routing).
 - [Container Runtime Workshop: Understanding the Reality of Containers through namespaces and cgroups](./infra/container_runtime_en.md)
   - Replicate the magic behind `podman run` by manually creating namespaces/cgroups.
-- Message Queue Workshop: Learning Pub/Sub and Queuing with RabbitMQ (Planned)
-  - Asynchronous messaging with RabbitMQ + Producer/Consumer containers.
+- [Redis Workshop: Real-time Game Leaderboard with Sorted Sets](./infra/cache.md)
+  - Build a high-performance leaderboard using Redis Sorted Sets and manage banned users with Sets.
+- [Message Queue Workshop: Learning Pub/Sub and Queuing with RabbitMQ](./infra/rabbitmq_en.md)
+  - Build a real-time crypto monitoring system using RabbitMQ Topic Exchange.
 - Object Storage Workshop: Learning S3-Compatible API with MinIO (Planned)
   - MinIO construction + bucket operations and signed URL generation using AWS CLI/SDK.
 - Observability Workshop: Metric Collection and Visualization with Prometheus + Grafana (Planned)
